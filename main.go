@@ -32,6 +32,18 @@ func main() {
 	user.Get("/", controllers.GetUserById)
 	user.Get("/datatable", controllers.UserDatatable)
 	// Group Products
+	product := api.Group("/product")
+	product.Get("/all", controllers.GetAllProducts)
+	product.Get("/datatable", controllers.GetDatatableProducts)
+	product.Post("/", controllers.CreateProduct)
+	product.Put("/", controllers.EditProduct)
+	product.Delete("/", controllers.DeleteProduct)
+	// Group Category
+	category := api.Group("/category")
+	category.Get("/label", controllers.GetCategoriesLabel)
+	category.Post("/", controllers.CreateCategory)
+	category.Put("/", controllers.UpdateCategory)
 
 	app.Listen(":8000")
+
 }
