@@ -30,6 +30,7 @@ func main() {
 	user.Get("/all", controllers.Index)
 	user.Put("/", controllers.EditUser)
 	user.Get("/", controllers.GetUserById)
+	user.Get("/datatable", controllers.UserDatatable)
 	// Group Products
 
 	app.Listen(":8000")
