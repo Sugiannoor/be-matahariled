@@ -65,7 +65,7 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 
 	// Lakukan pengambilan data dari database dengan menggunakan parameter limit, sort, dan sort_by
 	var products []models.Product
-	query := initialize.DB.Model(&models.Product{})
+	query := initialize.DB.Preload("File").Preload("Category").Model(&models.Product{})
 
 	// Jika parameter search tidak kosong, tambahkan filter pencarian
 	if search != "" {
@@ -91,13 +91,43 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
-	// Kembalikan respons datatable
-	response := helpers.GeneralResponse{
+	response := helpers.DataTableResponse{
+		CurrentPage:  1,                                  // Nomor halaman saat ini (default 1)
+		FirstPageURL: "",                                 // URL halaman pertama
+		From:         1,                                  // Nomor record pertama pada halaman saat ini
+		LastPage:     1,                                  // Total jumlah halaman (default 1)
+		LastPageURL:  "",                                 // URL halaman terakhir
+		NextPageURL:  "",                                 // URL halaman berikutnya
+		PrevPageURL:  "",                                 // URL halaman sebelumnya
+		To:           len(products),                      // Nomor record terakhir pada halaman saat ini
+		Total:        len(products),                      // Total jumlah record
+		Data:         make([]interface{}, len(products)), // Buat slice interface{} dengan panjang yang sama dengan users
+	}
+
+	for i, product := range products {
+		// Buat map untuk setiap produk
+		productMap := map[string]interface{}{
+			"product_id":  product.ProductId,
+			"name":        product.Title,
+			"description": product.Description,
+			"created_at":  product.CreatedAt,
+			"updated_at":  product.UpdatedAt,
+			"FileId":      product.FileId,
+			"category_id": product.CategoryId,
+			"path_file":   product.File.Path,
+			"category":    product.Category.Category,
+		}
+
+		// Tambahkan map produk ke dalam slice Data pada respons
+		response.Data[i] = productMap
+	}
+
+	// Kembalikan respons JSON dengan format datatable
+	return c.JSON(helpers.GeneralResponse{
 		Code:   200,
 		Status: "OK",
-		Data:   products,
-	}
-	return c.JSON(response)
+		Data:   response,
+	})
 }
 
 func GetProductById(c *fiber.Ctx) error {
@@ -145,46 +175,18 @@ func GetProductById(c *fiber.Ctx) error {
 }
 
 func CreateProduct(c *fiber.Ctx) error {
-	var requestBody models.ProductCreateRequest
-	if err := c.BodyParser(&requestBody); err != nil {
+	// Ambil data produk dari form
+	title := c.FormValue("name")
+	description := c.FormValue("description")
+	categoryId, err := strconv.ParseInt(c.FormValue("category_id"), 10, 64)
+	if err != nil {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusBadRequest,
 			Status:  "Bad Request",
-			Message: "Invalid request body",
+			Message: "Invalid category ID",
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}
-
-	if err := validate.Struct(&requestBody); err != nil {
-		errors := make(map[string][]string)
-		for _, err := range err.(validator.ValidationErrors) {
-			field := err.Field()
-			var tagName string
-			switch field {
-			case "Title":
-				tagName = "title"
-			case "Description":
-				tagName = "description"
-			case "CategoryId":
-				tagName = "category_id"
-			case "File":
-				tagName = "file"
-			} // Mendapatkan nama tag JSON yang sesuai
-			message := fmt.Sprintf("%s is required", tagName) // Pesan kesalahan yang disesuaikan
-			errors[tagName] = append(errors[field], message)
-		}
-		response := helpers.ResponseError{
-			Code:   fiber.StatusBadRequest,
-			Status: "Bad Request",
-			Error:  errors,
-		}
-		return c.Status(fiber.StatusBadRequest).JSON(response)
-	}
-
-	// Ambil data produk dari form
-	title := requestBody.Title
-	description := requestBody.Description
-	categoryId := requestBody.CategoryId
 
 	// Simpan file yang diunggah ke folder public
 	file, err := c.FormFile("file")
@@ -192,7 +194,7 @@ func CreateProduct(c *fiber.Ctx) error {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusBadRequest,
 			Status:  "Bad Request",
-			Message: "File mohon diisi",
+			Message: "File is required",
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}

@@ -34,6 +34,7 @@ func main() {
 	// Group Products
 	product := api.Group("/product")
 	product.Get("/all", controllers.GetAllProducts)
+	product.Get("/", controllers.GetProductById)
 	product.Get("/datatable", controllers.GetDatatableProducts)
 	product.Post("/", controllers.CreateProduct)
 	product.Put("/", controllers.EditProduct)
@@ -43,6 +44,10 @@ func main() {
 	category.Get("/label", controllers.GetCategoriesLabel)
 	category.Post("/", controllers.CreateCategory)
 	category.Put("/", controllers.UpdateCategory)
+
+	// Group Contract
+	contract := api.Group("/contract")
+	contract.Get("/all", controllers.GetAllContracts)
 
 	app.Listen(":8000")
 

@@ -11,9 +11,10 @@ type Product struct {
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 	FileId      int64     `json:"file_id"`
-	File        File      `gorm:"constraint:OnDelete:CASCADE;" json:"file"`
+	File        File      `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASADE" json:"file"`
 	CategoryId  int64     `json:"category_id" form:"category_id"`
 	Category    Category  `json:"category"`
+	// ContractId  int64     `gorm:"index" json:"contract_id"`
 }
 
 type ProductResponse struct {
@@ -29,8 +30,8 @@ type ProductResponse struct {
 }
 
 type ProductCreateRequest struct {
-	Title       string `json:"title" validate:"required"`
-	Description string `json:"description" validate:"required"`
+	Title       string `json:"name" form:"name" validate:"required"`
+	Description string `json:"description" form:"description" validate:"required"`
 	File        File   `json:"file" form:"file" validate:"required"`
 	CategoryId  int64  `json:"category_id" form:"category_id" validate:"required"`
 }
