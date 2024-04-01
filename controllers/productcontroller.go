@@ -57,6 +57,7 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 	sort := c.Query("sort")
 	sortBy := c.Query("sort_by")
 	search := c.Query("search")
+	category_id := c.Query("category_id")
 
 	// Tentukan default nilai jika parameter tidak ada
 	if limit <= 0 {
@@ -75,6 +76,10 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 	// Jika parameter sort dan sort_by disediakan, lakukan pengurutan berdasarkan kolom yang dimaksud
 	if sort != "" && sortBy != "" {
 		query = query.Order(fmt.Sprintf("%s %s", sortBy, sort))
+	}
+
+	if category_id != "" {
+		query = query.Where("category_id = ?", category_id)
 	}
 
 	// Limit jumlah data yang diambil sesuai dengan nilai parameter limit
@@ -112,7 +117,7 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 			"description": product.Description,
 			"created_at":  product.CreatedAt,
 			"updated_at":  product.UpdatedAt,
-			"FileId":      product.FileId,
+			"file_id":     product.FileId,
 			"category_id": product.CategoryId,
 			"path_file":   product.File.Path,
 			"category":    product.Category.Category,

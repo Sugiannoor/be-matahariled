@@ -48,6 +48,10 @@ func main() {
 	// Group Contract
 	contract := api.Group("/contract")
 	contract.Get("/all", controllers.GetAllContracts)
+	contract.Get("/datatable", controllers.GetContractsDataTable)
+	contract.Post("/", controllers.CreateContract)
+	contract.Put("/:id", controllers.UpdateContract)
+	contract.Delete("/:id", controllers.DeleteContract)
 
 	app.Listen(":8000")
 

@@ -14,7 +14,6 @@ type Product struct {
 	File        File      `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASADE" json:"file"`
 	CategoryId  int64     `json:"category_id" form:"category_id"`
 	Category    Category  `json:"category"`
-	// ContractId  int64     `gorm:"index" json:"contract_id"`
 }
 
 type ProductResponse struct {
