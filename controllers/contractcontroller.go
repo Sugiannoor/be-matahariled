@@ -240,7 +240,7 @@ func GetContractsDataTable(c *fiber.Ctx) error {
 	}
 
 	// Membuat slice untuk menyimpan respons data kontrak
-	contractResponses := make([]models.ContractResponse, len(contracts))
+	contractResponses := make([]models.ContractResponseDatatable, len(contracts))
 
 	// Mengisi data respons kontrak
 	for i, contract := range contracts {
@@ -248,17 +248,22 @@ func GetContractsDataTable(c *fiber.Ctx) error {
 		userName := contract.User.FullName // Pastikan atribut 'Name' adalah atribut yang benar untuk menyimpan nama pengguna
 
 		// Mendapatkan daftar nama produk dari relasi
-		var productNames []string
+		var productNames []map[string]interface{}
 		for _, product := range contract.Products {
-			productNames = append(productNames, product.Title) // Pastikan atribut 'Name' adalah atribut yang benar untuk menyimpan nama produk
+			productInfo := map[string]interface{}{
+				"name": product.Title,
+				"id":   product.ProductId,
+			}
+			productNames = append(productNames, productInfo)
 		}
 
-		contractResponses[i] = models.ContractResponse{
+		contractResponses[i] = models.ContractResponseDatatable{
 			ContractId:   contract.ContractId,
 			Title:        contract.Title,
 			Description:  contract.Description,
 			StartDate:    contract.StartDate,
 			EndDate:      contract.EndDate,
+			UserId:       contract.UserID,
 			UserName:     userName,
 			ProductNames: productNames,
 		}

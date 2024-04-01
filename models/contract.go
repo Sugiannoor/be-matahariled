@@ -26,6 +26,17 @@ type ContractResponse struct {
 	ProductNames []string `json:"product"`
 }
 
+type ContractResponseDatatable struct {
+	ContractId   int64                    `json:"contract_id"`
+	Title        string                   `json:"title"`
+	Description  string                   `json:"description"`
+	StartDate    string                   `gorm:"type:varchar(20)" json:"start_date"`
+	EndDate      string                   `gorm:"type:varchar(20)" json:"end_date"`
+	UserId       int64                    `json:"user_id"`
+	UserName     string                   `json:"username"`
+	ProductNames []map[string]interface{} `json:"product"`
+}
+
 type ContractRequest struct {
 	Title       string  `json:"title" validate:"required"`
 	Description string  `json:"description"`

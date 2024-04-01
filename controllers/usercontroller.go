@@ -31,6 +31,38 @@ func Index(c *fiber.Ctx) error {
 
 	return c.JSON(response)
 }
+func GetUsersLabel(c *fiber.Ctx) error {
+	// Ambil semua pengguna dari database
+	var users []models.User
+	if err := initialize.DB.Find(&users).Error; err != nil {
+		// Jika terjadi kesalahan saat mengambil pengguna, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat respons dengan format yang diinginkan
+	var userOptions []map[string]interface{}
+	for _, user := range users {
+		option := map[string]interface{}{
+			"value": user.UserId,
+			"label": user.FullName, // Atur atribut yang sesuai dengan nama pengguna
+		}
+		userOptions = append(userOptions, option)
+	}
+
+	// Kembalikan respons sukses dengan data pengguna ke klien
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   userOptions,
+	}
+	return c.JSON(response)
+}
+
 func GetUserById(c *fiber.Ctx) error {
 	// Ambil ID pengguna dari parameter URL
 	userIdStr := c.Query("id")

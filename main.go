@@ -31,11 +31,13 @@ func main() {
 	user.Put("/", controllers.EditUser)
 	user.Get("/", controllers.GetUserById)
 	user.Get("/datatable", controllers.UserDatatable)
+	user.Get("/label", controllers.GetUsersLabel)
 	// Group Products
 	product := api.Group("/product")
 	product.Get("/all", controllers.GetAllProducts)
 	product.Get("/", controllers.GetProductById)
 	product.Get("/datatable", controllers.GetDatatableProducts)
+	product.Get("/label", controllers.GetProductsLabel)
 	product.Post("/", controllers.CreateProduct)
 	product.Put("/", controllers.EditProduct)
 	product.Delete("/", controllers.DeleteProduct)

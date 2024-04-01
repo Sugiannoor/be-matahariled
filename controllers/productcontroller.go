@@ -51,6 +51,38 @@ func GetAllProducts(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+func GetProductsLabel(c *fiber.Ctx) error {
+	// Ambil semua produk dari database
+	var products []models.Product
+	if err := initialize.DB.Find(&products).Error; err != nil {
+		// Jika terjadi kesalahan saat mengambil produk, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat respons dengan format yang diinginkan
+	var productOptions []map[string]interface{}
+	for _, product := range products {
+		option := map[string]interface{}{
+			"value": product.ProductId,
+			"label": product.Title,
+		}
+		productOptions = append(productOptions, option)
+	}
+
+	// Kembalikan respons sukses dengan data produk ke klien
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   productOptions,
+	}
+	return c.JSON(response)
+}
+
 func GetDatatableProducts(c *fiber.Ctx) error {
 	// Ambil nilai parameter limit, sort, sort_by, dan search dari query string
 	limit, _ := strconv.Atoi(c.Query("limit"))
