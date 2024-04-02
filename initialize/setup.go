@@ -10,7 +10,7 @@ import (
 var DB *gorm.DB
 
 func ConnectDatabase() {
-	db, err := gorm.Open(mysql.Open("root:@tcp(localhost:3306)/db_matahariled?parseTime=true"))
+	db, err := gorm.Open(mysql.Open("root:@tcp(localhost:3306)/matahariled?parseTime=true"))
 	if err != nil {
 		panic(err)
 	}
@@ -20,5 +20,6 @@ func ConnectDatabase() {
 	db.AutoMigrate(&models.Product{})
 	db.AutoMigrate(&models.Category{})
 	db.AutoMigrate(&models.Contract{})
+	db.AutoMigrate(&models.History{})
 	DB = db
 }

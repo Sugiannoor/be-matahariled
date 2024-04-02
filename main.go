@@ -18,6 +18,7 @@ func main() {
 	}))
 	// Base
 	api := app.Group("/api")
+	app.Static("/public", "./public")
 
 	// Group Auth
 	auth := api.Group("/auth")
@@ -54,6 +55,14 @@ func main() {
 	contract.Post("/", controllers.CreateContract)
 	contract.Put("/:id", controllers.UpdateContract)
 	contract.Delete("/:id", controllers.DeleteContract)
+
+	//Group History
+	history := api.Group("/history")
+	history.Get("/all", controllers.GetAllHistories)
+	history.Get("/datatable", controllers.GetDatatableHistories)
+	history.Post("/", controllers.CreateHistory)
+	history.Put("/:id", controllers.UpdateHistory)
+	history.Delete("/:id", controllers.DeleteHistory)
 
 	app.Listen(":8000")
 
