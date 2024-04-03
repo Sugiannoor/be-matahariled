@@ -58,6 +58,28 @@ func GetAllContracts(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(response)
 }
 
+func GetCountContract(c *fiber.Ctx) error {
+	// Hitung jumlah total kontrak dari database
+	var count int64
+	if err := initialize.DB.Model(&models.Contract{}).Count(&count).Error; err != nil {
+		// Jika terjadi kesalahan saat menghitung kontrak, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kembalikan respons dengan total kontrak
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   count,
+	}
+	return c.JSON(response)
+}
+
 func CreateContract(c *fiber.Ctx) error {
 	// Parse body request ke dalam struct ContractCreateRequest
 	var requestBody models.ContractRequest

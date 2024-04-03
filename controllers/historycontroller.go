@@ -52,6 +52,28 @@ func GetAllHistories(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(response)
 }
 
+func GetCountHistory(c *fiber.Ctx) error {
+	// Hitung jumlah total riwayat dari database
+	var count int64
+	if err := initialize.DB.Model(&models.History{}).Count(&count).Error; err != nil {
+		// Jika terjadi kesalahan saat menghitung riwayat, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kembalikan respons dengan total riwayat
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   count,
+	}
+	return c.JSON(response)
+}
+
 func GetDatatableHistories(c *fiber.Ctx) error {
 	// Ambil nilai parameter limit, sort, sort_by, search, dan product_id dari query string
 	limit, _ := strconv.Atoi(c.Query("limit"))

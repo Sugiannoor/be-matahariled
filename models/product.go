@@ -39,6 +39,7 @@ type ProductEditRequest struct {
 	ProductId   int64  `json:"product_id" form:"product_id" validate:"required"`
 	Title       string `json:"title" validate:"required"`
 	Description string `json:"description" validate:"required"`
-	File        File   `json:"file" form:"file"`
+	FileId      int64  `gorm:"index" json:"file_id"`
+	File        File   `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASADE" json:"file"`
 	CategoryId  int64  `json:"category_id" form:"category_id" validate:"required"`
 }

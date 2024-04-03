@@ -20,7 +20,7 @@ func init() {
 }
 
 func Index(c *fiber.Ctx) error {
-	var user []models.User
+	var user []models.UserResponse
 	initialize.DB.Find(&user)
 
 	response := helpers.ResponseGetAll{
@@ -59,6 +59,27 @@ func GetUsersLabel(c *fiber.Ctx) error {
 		Code:   fiber.StatusOK,
 		Status: "OK",
 		Data:   userOptions,
+	}
+	return c.JSON(response)
+}
+func GetCountUser(c *fiber.Ctx) error {
+	// Hitung jumlah total pengguna dari database
+	var count int64
+	if err := initialize.DB.Model(&models.User{}).Count(&count).Error; err != nil {
+		// Jika terjadi kesalahan saat menghitung pengguna, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kembalikan respons dengan total pengguna
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   count,
 	}
 	return c.JSON(response)
 }
@@ -308,7 +329,7 @@ func UserDatatable(c *fiber.Ctx) error {
 	}
 
 	// Lakukan pengambilan data dari database dengan menggunakan parameter limit, sort, dan sort_by
-	var users []models.User
+	var users []models.UserResponse
 	query := initialize.DB.Model(&models.User{})
 
 	// Jika parameter search tidak kosong, tambahkan filter pencarian

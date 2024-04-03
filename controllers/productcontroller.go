@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
@@ -79,6 +78,27 @@ func GetProductsLabel(c *fiber.Ctx) error {
 		Code:   fiber.StatusOK,
 		Status: "OK",
 		Data:   productOptions,
+	}
+	return c.JSON(response)
+}
+func GetCountProduct(c *fiber.Ctx) error {
+	// Hitung jumlah total produk dari database
+	var count int64
+	if err := initialize.DB.Model(&models.Product{}).Count(&count).Error; err != nil {
+		// Jika terjadi kesalahan saat menghitung produk, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kembalikan respons dengan total produk
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   count,
 	}
 	return c.JSON(response)
 }
@@ -294,145 +314,141 @@ func CreateProduct(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(response)
 }
 
-func EditProduct(c *fiber.Ctx) error {
-	var requestBody models.ProductEditRequest
-	if err := c.BodyParser(&requestBody); err != nil {
+func UpdateProduct(c *fiber.Ctx) error {
+	productID, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil || productID <= 0 {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusBadRequest,
 			Status:  "Bad Request",
-			Message: "Invalid request body",
+			Message: "Invalid or missing product ID",
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}
 
-	// Validasi struktur data
-	if err := validate.Struct(&requestBody); err != nil {
-		errors := make(map[string][]string)
-		for _, err := range err.(validator.ValidationErrors) {
-			field := err.Field()
-			var tagName string
-			switch field {
-			case "Title":
-				tagName = "title"
-			case "ProductId":
-				tagName = "product_id"
-			case "Description":
-				tagName = "description"
-			case "CategoryId":
-				tagName = "category_id"
-			} // Mendapatkan nama tag JSON yang sesuai
-			message := fmt.Sprintf("%s is required", tagName) // Pesan kesalahan yang disesuaikan
-			errors[tagName] = append(errors[field], message)
-		}
-		response := helpers.ResponseError{
-			Code:   fiber.StatusBadRequest,
-			Status: "Bad Request",
-			Error:  errors,
-		}
-		return c.Status(fiber.StatusBadRequest).JSON(response)
-	}
-
-	// Ambil ID produk dari URL parameter
-	productId := requestBody.ProductId
-
-	// Ambil data produk yang akan diedit dari database
-	var existingProduct models.Product
-	if err := initialize.DB.First(&existingProduct, productId).Error; err != nil {
+	// Periksa apakah riwayat dengan productID tersebut ada di database
+	var product models.Product
+	if err := initialize.DB.First(&product, productID).Error; err != nil {
 		response := helpers.ResponseMassage{
-			Code:    fiber.StatusNotFound,
-			Status:  "Not Found",
-			Message: "Product not found",
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Product Not Found",
 		}
-		return c.Status(fiber.StatusNotFound).JSON(response)
+		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}
 
-	// Simpan file yang diunggah ke folder public
+	// Ambil data baru dari form
+	title := c.FormValue("title")
+	description := c.FormValue("description")
+	categoryIdStr := c.FormValue("category_id")
+	categoryId, err := strconv.ParseInt(categoryIdStr, 10, 64)
+	if err != nil || categoryId <= 0 {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Invalid or missing Product Id",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	// Validasi apakah title atau description kosong
+	if title == "" || description == "" {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Title and description are required",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	// Periksa apakah product dengan productId tersebut ada di database
+
+	// Cek apakah ada file baru yang diunggah
 	file, err := c.FormFile("file")
 	if err != nil {
-		response := helpers.ResponseMassage{
-			Code:    fiber.StatusBadRequest,
-			Status:  "Bad Request",
-			Message: "Failed to upload file",
-		}
-		return c.Status(fiber.StatusBadRequest).JSON(response)
-	}
-
-	// Generate nama unik untuk file yang diunggah
-	filename := uuid.New().String() + filepath.Ext(file.Filename)
-
-	// Simpan file ke direktori publik
-	if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
-		response := helpers.ResponseMassage{
-			Code:    fiber.StatusInternalServerError,
-			Status:  "Internal Server Error",
-			Message: "Failed to save file",
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
-	}
-
-	// Buat entitas File baru untuk disimpan dalam database
-	newFile := models.File{
-		Path:      fmt.Sprintf("/public/%s", filename),
-		File_name: filename,
-		Size:      strconv.FormatInt(file.Size, 10),
-		Format:    filepath.Ext(file.Filename),
-	}
-
-	// Simpan file ke dalam database
-	if err := initialize.DB.Create(&newFile).Error; err != nil {
-		response := helpers.ResponseMassage{
-			Code:    fiber.StatusInternalServerError,
-			Status:  "Internal Server Error",
-			Message: "Failed to save new file data",
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
-	}
-	if existingProduct.FileId != 0 {
-		// Memuat data file terkait
-		if err := initialize.DB.Model(&existingProduct).Association("File").Find(&existingProduct.File); err != nil {
-			// Handle error jika gagal memuat data file
+	} else {
+		// Jika ada file baru, simpan file baru dan hapus file lama
+		// Generate nama unik untuk file yang diunggah
+		filename := uuid.New().String() + filepath.Ext(file.Filename)
+		// eapatkan data file id  dari baris tesb
+		// Simpan file ke direktori publik
+		if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
 			response := helpers.ResponseMassage{
 				Code:    fiber.StatusInternalServerError,
 				Status:  "Internal Server Error",
-				Message: "Gagal Memuat Data File",
+				Message: "Failed to save file",
 			}
 			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
 
-		// Hapus file lama dari sistem file lokal
-		oldFile := existingProduct.File
-		if err := os.Remove("./" + oldFile.Path); err != nil {
+		// Hapus file lama dari direktori publik
+		if product.FileId != 0 {
+			// Memuat data file terkait
+			if err := initialize.DB.Model(&product).Association("File").Find(&product.File); err != nil {
+				// Handle error jika gagal memuat data file
+				response := helpers.ResponseMassage{
+					Code:    fiber.StatusInternalServerError,
+					Status:  "Internal Server Error",
+					Message: "Gagal Memuat Data File",
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(response)
+			}
+
+			// Hapus file lama dari sistem file lokal
+			oldFile := product.File
+			if err := os.Remove("./" + oldFile.Path); err != nil {
+				response := helpers.ResponseMassage{
+					Code:    fiber.StatusInternalServerError,
+					Status:  "Internal Server Error",
+					Message: "Gagal Menghapus Data Local",
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(response)
+			}
+
+			// Hapus entitas file lama dari basis data
+			if err := initialize.DB.Delete(&oldFile).Error; err != nil {
+				response := helpers.ResponseMassage{
+					Code:    fiber.StatusInternalServerError,
+					Status:  "Internal Server Error",
+					Message: "Gagal Menghapus Data File",
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(response)
+			}
+		}
+
+		// Buat entitas File baru untuk disimpan dalam database
+		newFile := models.File{
+			Path:      fmt.Sprintf("/public/%s", filename),
+			File_name: filename,
+			Size:      strconv.FormatInt(file.Size, 10),
+			Format:    filepath.Ext(file.Filename),
+		}
+
+		// Simpan file baru ke dalam database
+		if err := initialize.DB.Create(&newFile).Error; err != nil {
 			response := helpers.ResponseMassage{
 				Code:    fiber.StatusInternalServerError,
 				Status:  "Internal Server Error",
-				Message: oldFile.Path,
+				Message: "Failed to save new file data",
 			}
 			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
 
-		// Hapus entitas file lama dari basis data
-		if err := initialize.DB.Delete(&oldFile).Error; err != nil {
-			response := helpers.ResponseMassage{
-				Code:    fiber.StatusInternalServerError,
-				Status:  "Internal Server Error",
-				Message: "Gagal Menghapus Data File",
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(response)
-		}
+		// Ganti file lama dengan file baru
+		product.File = newFile
 	}
 
-	// Update data produk dengan data baru
-	existingProduct.Title = requestBody.Title
-	existingProduct.Description = requestBody.Description
-	existingProduct.CategoryId = requestBody.CategoryId
-	existingProduct.FileId = newFile.FileId
+	// Update data riwayat dengan data baru
+	product.Title = title
+	product.Description = description
+	product.ProductId = productID
+	product.CategoryId = categoryId
 
-	// Simpan data produk yang telah diperbarui ke dalam database
-	if err := initialize.DB.Save(&existingProduct).Error; err != nil {
+	// Simpan perubahan ke dalam database
+	if err := initialize.DB.Save(&product).Error; err != nil {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusInternalServerError,
 			Status:  "Internal Server Error",
-			Message: "Failed to save updated product data",
+			Message: "Failed to update history",
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
@@ -441,7 +457,7 @@ func EditProduct(c *fiber.Ctx) error {
 	response := helpers.ResponseMassage{
 		Code:    fiber.StatusOK,
 		Status:  "OK",
-		Message: "Product updated successfully",
+		Message: "History updated successfully",
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }

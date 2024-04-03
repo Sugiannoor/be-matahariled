@@ -45,6 +45,28 @@ func GetCategoriesLabel(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
+func GetCountCategory(c *fiber.Ctx) error {
+	// Hitung jumlah total kategori dari database
+	var count int64
+	if err := initialize.DB.Model(&models.Category{}).Count(&count).Error; err != nil {
+		// Jika terjadi kesalahan saat menghitung kategori, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kembalikan respons dengan total kategori
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   count,
+	}
+	return c.JSON(response)
+}
+
 func CreateCategory(c *fiber.Ctx) error {
 	// Bind request body ke struct Category
 	var category models.Category
