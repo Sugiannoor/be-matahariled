@@ -4,6 +4,7 @@ import (
 	"Matahariled/helpers"
 	"Matahariled/initialize"
 	"Matahariled/models"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 func GetAllHistories(c *fiber.Ctx) error {
@@ -35,6 +37,8 @@ func GetAllHistories(c *fiber.Ctx) error {
 			HistoryId:    history.HistoryId,
 			Title:        history.Title,
 			Description:  history.Description,
+			StartDate:    history.StartDate,
+			EndDate:      history.EndDate,
 			ProductName:  history.Product.Title,
 			CategoryName: history.Product.Category.Category,
 			PathFile:     history.File.Path,
@@ -48,6 +52,55 @@ func GetAllHistories(c *fiber.Ctx) error {
 		Code:   fiber.StatusOK,
 		Status: "OK",
 		Data:   historyResponses,
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+func GetHistoryById(c *fiber.Ctx) error {
+	// Ambil ID history dari parameter URL
+	historyId := c.Params("id")
+
+	// Buat variabel untuk menyimpan data history
+	var history models.History
+
+	// Cari history berdasarkan ID
+	if err := initialize.DB.Preload("Product").Preload("Product.Category").Preload("File").Where("history_id = ?", historyId).First(&history).Error; err != nil {
+		// Jika history tidak ditemukan, kirim respons not found
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusNotFound,
+				Status:  "Not Found",
+				Message: "History not found",
+			}
+			return c.Status(fiber.StatusNotFound).JSON(response)
+		}
+		// Jika terjadi kesalahan lain saat mengambil history, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to fetch history",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Membuat respons untuk history yang ditemukan
+	historyResponse := models.HistoryResponse{
+		HistoryId:    history.HistoryId,
+		Title:        history.Title,
+		Description:  history.Description,
+		StartDate:    history.StartDate,
+		EndDate:      history.EndDate,
+		ProductName:  history.Product.Title,
+		CategoryName: history.Product.Category.Category,
+		PathFile:     history.File.Path,
+		CreatedAt:    history.CreatedAt,
+		UpdatedAt:    history.UpdatedAt,
+	}
+
+	// Mengirimkan respons sukses dengan data history yang ditemukan
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   historyResponse,
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }
@@ -143,6 +196,8 @@ func GetDatatableHistories(c *fiber.Ctx) error {
 			"description":   history.Description,
 			"product_id":    history.ProductId,
 			"product_name":  history.Product.Title,
+			"start_date":    history.StartDate,
+			"end_date":      history.EndDate,
 			"category_name": history.Product.Category.Category,
 			"file_id":       history.FileId,
 			"path_file":     history.File.Path,
@@ -165,6 +220,8 @@ func GetDatatableHistories(c *fiber.Ctx) error {
 func CreateHistory(c *fiber.Ctx) error {
 	// Ambil data produk dari form
 	title := c.FormValue("title")
+	start_date := c.FormValue("start_date")
+	end_date := c.FormValue("end_date")
 	description := c.FormValue("description")
 	productIdStr := c.FormValue("product_id")
 	productId, err := strconv.ParseInt(productIdStr, 10, 64)
@@ -240,6 +297,8 @@ func CreateHistory(c *fiber.Ctx) error {
 	// Buat entitas Product
 	history := models.History{
 		Title:       title,
+		StartDate:   start_date,
+		EndDate:     end_date,
 		Description: description,
 		ProductId:   productId,
 		FileId:      fileModel.FileId,
@@ -289,6 +348,8 @@ func UpdateHistory(c *fiber.Ctx) error {
 
 	// Ambil data baru dari form
 	title := c.FormValue("title")
+	start_date := c.FormValue("start_date")
+	end_date := c.FormValue("end_date")
 	description := c.FormValue("description")
 	productIdStr := c.FormValue("product_id")
 	productId, err := strconv.ParseInt(productIdStr, 10, 64)
@@ -398,6 +459,8 @@ func UpdateHistory(c *fiber.Ctx) error {
 	}
 
 	// Update data riwayat dengan data baru
+	history.StartDate = start_date
+	history.EndDate = end_date
 	history.Title = title
 	history.Description = description
 	history.ProductId = productId

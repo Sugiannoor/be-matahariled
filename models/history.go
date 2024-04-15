@@ -6,6 +6,8 @@ type History struct {
 	HistoryId   int64     `gorm:"primaryKey" json:"history_id"`
 	Title       string    `gorm:"type:varchar(255)" json:"title"`
 	Description string    `gorm:"type:varchar(255)" json:"description"`
+	StartDate   string    `gorm:"type:varchar(20)" json:"start_date"`
+	EndDate     string    `gorm:"type:varchar(20)" json:"end_date"`
 	ProductId   int64     `gorm:"index" json:"product_id"`
 	Product     Product   `json:"product"`
 	FileId      int64     `gorm:"index" json:"file_id"`
@@ -18,6 +20,8 @@ type HistoryResponse struct {
 	HistoryId    int64     `json:"history_id"`
 	Title        string    `json:"title"`
 	Description  string    `json:"description"`
+	StartDate    string    `gorm:"type:varchar(20)" json:"start_date"`
+	EndDate      string    `gorm:"type:varchar(20)" json:"end_date"`
 	ProductName  string    `json:"product"`
 	CategoryName string    `json:"category"`
 	PathFile     string    `json:"path_file"`

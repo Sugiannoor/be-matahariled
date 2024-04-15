@@ -3,6 +3,7 @@ package main
 import (
 	"Matahariled/controllers"
 	"Matahariled/initialize"
+	"Matahariled/middleware"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -25,13 +26,14 @@ func main() {
 
 	// Group Auth
 	auth := api.Group("/auth")
-	auth.Get("/profile", controllers.Index)
+	auth.Get("/profile", controllers.GetProfileHandler)
 	auth.Post("/register", controllers.CreateUser)
+	auth.Post("/login", controllers.LoginHandler)
 
 	// User
 	user := api.Group("/user")
 	user.Delete("/", controllers.DeleteUser)
-	user.Get("/all", controllers.Index)
+	user.Get("/all", middleware.JWTMiddleware("Admin", "SuperAdmin"), controllers.Index)
 	user.Get("/count", controllers.GetCountUser)
 	user.Put("/", controllers.EditUser)
 	user.Get("/", controllers.GetUserById)
@@ -68,6 +70,7 @@ func main() {
 	history.Get("/all", controllers.GetAllHistories)
 	history.Get("/count", controllers.GetCountHistory)
 	history.Get("/datatable", controllers.GetDatatableHistories)
+	history.Get("/:id", controllers.GetHistoryById)
 	history.Post("/", controllers.CreateHistory)
 	history.Put("/:id", controllers.UpdateHistory)
 	history.Delete("/:id", controllers.DeleteHistory)

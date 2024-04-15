@@ -5,12 +5,16 @@ import (
 	"Matahariled/initialize"
 	"Matahariled/models"
 	"fmt"
+	"os"
 	"strconv"
+	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var validate *validator.Validate
@@ -20,7 +24,7 @@ func init() {
 }
 
 func Index(c *fiber.Ctx) error {
-	var user []models.UserResponse
+	var user []models.User
 	initialize.DB.Find(&user)
 
 	response := helpers.ResponseGetAll{
@@ -31,6 +35,76 @@ func Index(c *fiber.Ctx) error {
 
 	return c.JSON(response)
 }
+func LoginHandler(c *fiber.Ctx) error {
+	// Parse body permintaan
+	var req models.LoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Invalid request body",
+		})
+	}
+
+	// Ambil data pengguna dari database berdasarkan email
+	var user models.User
+	if err := initialize.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusUnauthorized,
+			Status:  "Unauthorized",
+			Message: "Invalid email or password",
+		})
+	}
+
+	// Periksa kecocokan password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusUnauthorized,
+			Status:  "Unauthorized",
+			Message: "Invalid email or password",
+		})
+	}
+
+	// Buat token JWT
+	token := jwt.New(jwt.SigningMethodHS256)
+
+	// Set klaim JWT
+	claims := token.Claims.(jwt.MapClaims)
+	claims["user_id"] = user.UserId
+	claims["email"] = user.Email
+	claims["role"] = user.Role
+	claims["exp"] = time.Now().Add(time.Hour * 24).Unix() // Token berlaku selama 24 jam
+
+	// Tanda tangani token dengan secret key
+	secret := []byte(os.Getenv("JWT_SECRET"))
+	if secret == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "JWT secret key not found",
+		})
+	}
+	tokenString, err := token.SignedString(secret)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to sign JWT token",
+		})
+	}
+	c.Set("Authorization", "Bearer "+tokenString)
+	// Kirim token JWT dan model User dalam respons
+	res := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data: map[string]interface{}{
+			"access_token": tokenString,
+			"user":         user,
+		},
+	}
+	return c.JSON(res)
+}
+
 func GetUsersLabel(c *fiber.Ctx) error {
 	// Ambil semua pengguna dari database
 	var users []models.User
@@ -119,6 +193,74 @@ func GetUserById(c *fiber.Ctx) error {
 		Data:   user,
 	}
 	return c.JSON(response)
+}
+func GetProfileHandler(c *fiber.Ctx) error {
+	// Ambil token dari header Authorization
+	authHeader := c.Get("Authorization")
+	tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
+
+	// Parse dan verifikasi token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Verifikasi metode tanda tangan
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		// Return secret key yang sama yang digunakan untuk menandatangani token
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+	if err != nil {
+		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusUnauthorized,
+			Status:  "Unauthorized",
+			Message: "Invalid or expired token",
+		})
+	}
+
+	// Periksa apakah token valid
+	if !token.Valid {
+		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusUnauthorized,
+			Status:  "Unauthorized",
+			Message: "Invalid or expired token",
+		})
+	}
+
+	// Ekstrak klaim JWT
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusUnauthorized,
+			Status:  "Unauthorized",
+			Message: "Invalid token claims",
+		})
+	}
+
+	// Ambil ID pengguna dari klaim JWT
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusUnauthorized,
+			Status:  "Unauthorized",
+			Message: "Invalid user ID in token claims",
+		})
+	}
+
+	// Ambil profil pengguna dari database berdasarkan ID pengguna
+	var user models.User
+	if err := initialize.DB.First(&user, int(userID)).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to get user profile",
+		})
+	}
+
+	// Kirim profil pengguna dalam respons
+	return c.JSON(helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   user,
+	})
 }
 
 // Create

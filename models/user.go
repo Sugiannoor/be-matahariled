@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type User struct {
 	UserId      int64      `gorm:"primaryKey" json:"user_id"`
@@ -22,7 +24,7 @@ type UserResponse struct {
 	Password    string     `gorm:"-"`
 	Email       string     `gorm:"type:varchar(100)" json:"email" validate:"required"`
 	Address     *string    `gorm:"type:varchar(300)" json:"address"`
-	Role        string     `gorm:"type:ENUM('Admin', 'Customer', 'SuperAdmin'); default:'Customer'" json:"role"`
+	Role        string     `gorm:"type:ENUM('Admin', 'Customer', 'Superadmin'); default:'Customer'" json:"role"`
 	CreatedAt   *time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   *time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }
