@@ -4,6 +4,7 @@ import (
 	"Matahariled/helpers"
 	"Matahariled/initialize"
 	"Matahariled/models"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 func GetAllProducts(c *fiber.Ctx) error {
@@ -189,28 +191,33 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 
 func GetProductById(c *fiber.Ctx) error {
 	// Ambil ID produk dari parameter URL
-	productId, err := strconv.ParseInt(c.Query("id"), 10, 64)
-	if err != nil {
-		// Jika ID tidak valid, kirim respons kesalahan ke klien
-		response := helpers.ResponseMassage{
-			Code:    400,
-			Status:  "Bad Request",
-			Message: "Id Product tidak valid",
+	productId := c.Params("id")
+
+	// Buat variabel untuk menyimpan data produk
+	var product models.Product
+
+	// Cari produk berdasarkan ID
+	if err := initialize.DB.Preload("Category").Preload("File").Where("product_id = ?", productId).First(&product).Error; err != nil {
+		// Jika produk tidak ditemukan, kirim respons not found
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusNotFound,
+				Status:  "Not Found",
+				Message: "Product not found",
+			}
+			return c.Status(fiber.StatusNotFound).JSON(response)
 		}
-		return c.Status(fiber.StatusBadRequest).JSON(response)
+		// Jika terjadi kesalahan lain saat mengambil produk, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to fetch product",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
-	var product models.Product
-	if err := initialize.DB.Preload("Category").Preload("File").First(&product, productId).Error; err != nil {
-		// Jika produk tidak ditemukan, kirim respons not found ke klien
-		response := helpers.ResponseMassage{
-			Code:    404,
-			Status:  "Not Found",
-			Message: "Product Tidak ditemukan",
-		}
-		return c.Status(fiber.StatusNotFound).JSON(response)
-	}
-	customResponse := models.ProductResponse{
+	// Membuat respons untuk produk yang ditemukan
+	productResponse := models.ProductResponse{
 		ProductId:   product.ProductId,
 		Title:       product.Title,
 		Description: product.Description,
@@ -218,18 +225,19 @@ func GetProductById(c *fiber.Ctx) error {
 		UpdatedAt:   product.UpdatedAt,
 		FileId:      product.FileId,
 		CategoryId:  product.CategoryId,
-		PathFile:    product.File.Path,         // Mengambil path file dari relasi File
-		Category:    product.Category.Category, // Mengambil nama kategori dari relasi Category
+		PathFile:    product.File.Path,
+		Category:    product.Category.Category,
 	}
 
-	// Kembalikan respons sukses dengan data produk ke klien
+	// Mengirimkan respons sukses dengan data produk yang ditemukan
 	response := helpers.GeneralResponse{
-		Code:   200,
+		Code:   fiber.StatusOK,
 		Status: "OK",
-		Data:   customResponse,
+		Data:   productResponse,
 	}
-	return c.JSON(response)
+	return c.Status(fiber.StatusOK).JSON(response)
 }
+
 
 func CreateProduct(c *fiber.Ctx) error {
 	// Ambil data produk dari form

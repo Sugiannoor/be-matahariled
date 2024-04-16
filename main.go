@@ -42,13 +42,13 @@ func main() {
 	// Group Products
 	product := api.Group("/product")
 	product.Get("/all", controllers.GetAllProducts)
-	product.Get("/", controllers.GetProductById)
 	product.Get("/count", controllers.GetCountProduct)
 	product.Get("/datatable", controllers.GetDatatableProducts)
 	product.Get("/label", controllers.GetProductsLabel)
 	product.Post("/", controllers.CreateProduct)
 	product.Put("/:id", controllers.UpdateProduct)
 	product.Delete("/", controllers.DeleteProduct)
+	product.Get("/:id", controllers.GetProductById)
 	// Group Category
 	category := api.Group("/category")
 	category.Get("/label", controllers.GetCategoriesLabel)
