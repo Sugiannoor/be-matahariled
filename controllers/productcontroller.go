@@ -30,15 +30,16 @@ func GetAllProducts(c *fiber.Ctx) error {
 	var customProducts []models.ProductResponse
 	for _, product := range products {
 		customProduct := models.ProductResponse{
-			ProductId:   product.ProductId,
-			Title:       product.Title,
-			Description: product.Description,
-			CreatedAt:   product.CreatedAt,
-			UpdatedAt:   product.UpdatedAt,
-			FileId:      product.FileId,
-			CategoryId:  product.CategoryId,
-			PathFile:    product.File.Path,
-			Category:    product.Category.Category,
+			ProductId:     product.ProductId,
+			Title:         product.Title,
+			Description:   product.Description,
+			Specification: product.Specification,
+			CreatedAt:     product.CreatedAt,
+			UpdatedAt:     product.UpdatedAt,
+			FileId:        product.FileId,
+			CategoryId:    product.CategoryId,
+			PathFile:      product.File.Path,
+			Category:      product.Category.Category,
 		}
 		customProducts = append(customProducts, customProduct)
 	}
@@ -166,15 +167,16 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 	for i, product := range products {
 		// Buat map untuk setiap produk
 		productMap := map[string]interface{}{
-			"product_id":  product.ProductId,
-			"name":        product.Title,
-			"description": product.Description,
-			"created_at":  product.CreatedAt,
-			"updated_at":  product.UpdatedAt,
-			"file_id":     product.FileId,
-			"category_id": product.CategoryId,
-			"path_file":   product.File.Path,
-			"category":    product.Category.Category,
+			"product_id":    product.ProductId,
+			"name":          product.Title,
+			"description":   product.Description,
+			"specification": product.Specification,
+			"created_at":    product.CreatedAt,
+			"updated_at":    product.UpdatedAt,
+			"file_id":       product.FileId,
+			"category_id":   product.CategoryId,
+			"path_file":     product.File.Path,
+			"category":      product.Category.Category,
 		}
 
 		// Tambahkan map produk ke dalam slice Data pada respons
@@ -218,15 +220,16 @@ func GetProductById(c *fiber.Ctx) error {
 
 	// Membuat respons untuk produk yang ditemukan
 	productResponse := models.ProductResponse{
-		ProductId:   product.ProductId,
-		Title:       product.Title,
-		Description: product.Description,
-		CreatedAt:   product.CreatedAt,
-		UpdatedAt:   product.UpdatedAt,
-		FileId:      product.FileId,
-		CategoryId:  product.CategoryId,
-		PathFile:    product.File.Path,
-		Category:    product.Category.Category,
+		ProductId:     product.ProductId,
+		Title:         product.Title,
+		Specification: product.Specification,
+		Description:   product.Description,
+		CreatedAt:     product.CreatedAt,
+		UpdatedAt:     product.UpdatedAt,
+		FileId:        product.FileId,
+		CategoryId:    product.CategoryId,
+		PathFile:      product.File.Path,
+		Category:      product.Category.Category,
 	}
 
 	// Mengirimkan respons sukses dengan data produk yang ditemukan
@@ -238,11 +241,11 @@ func GetProductById(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(response)
 }
 
-
 func CreateProduct(c *fiber.Ctx) error {
 	// Ambil data produk dari form
 	title := c.FormValue("name")
 	description := c.FormValue("description")
+	specification := c.FormValue("specification")
 	categoryId, err := strconv.ParseInt(c.FormValue("category_id"), 10, 64)
 	if err != nil {
 		response := helpers.ResponseMassage{
@@ -297,10 +300,11 @@ func CreateProduct(c *fiber.Ctx) error {
 
 	// Buat entitas Product
 	product := models.Product{
-		Title:       title,
-		Description: description,
-		CategoryId:  categoryId,
-		FileId:      fileModel.FileId,
+		Title:         title,
+		Specification: specification,
+		Description:   description,
+		CategoryId:    categoryId,
+		FileId:        fileModel.FileId,
 	}
 
 	// Simpan produk ke dalam database
@@ -347,6 +351,7 @@ func UpdateProduct(c *fiber.Ctx) error {
 	// Ambil data baru dari form
 	title := c.FormValue("title")
 	description := c.FormValue("description")
+	specification := c.FormValue("specification")
 	categoryIdStr := c.FormValue("category_id")
 	categoryId, err := strconv.ParseInt(categoryIdStr, 10, 64)
 	if err != nil || categoryId <= 0 {
@@ -359,7 +364,7 @@ func UpdateProduct(c *fiber.Ctx) error {
 	}
 
 	// Validasi apakah title atau description kosong
-	if title == "" || description == "" {
+	if title == "" || description == "" || specification == "" {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusBadRequest,
 			Status:  "Bad Request",
@@ -447,6 +452,7 @@ func UpdateProduct(c *fiber.Ctx) error {
 
 	// Update data riwayat dengan data baru
 	product.Title = title
+	product.Specification = specification
 	product.Description = description
 	product.ProductId = productID
 	product.CategoryId = categoryId
