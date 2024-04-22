@@ -142,7 +142,7 @@ func GetDatatableHistories(c *fiber.Ctx) error {
 
 	// Lakukan pengambilan data dari database dengan menggunakan parameter limit, sort, dan sort_by
 	var histories []models.History
-	query := initialize.DB.Preload("Product").Preload("Product.Category").Preload("File").Model(&models.History{})
+	query := initialize.DB.Preload("Product").Preload("Product.Category").Preload("User").Preload("File").Preload("Video").Model(&models.History{})
 
 	// Jika parameter search tidak kosong, tambahkan filter pencarian
 	if search != "" {
@@ -198,6 +198,10 @@ func GetDatatableHistories(c *fiber.Ctx) error {
 			"product_name":  history.Product.Title,
 			"start_date":    history.StartDate,
 			"end_date":      history.EndDate,
+			"embed":         history.Video.Embed,
+			"video_title":   history.Video.Title,
+			"user_id":       history.UserId,
+			"user":          history.User.FullName,
 			"category_name": history.Product.Category.Category,
 			"file_id":       history.FileId,
 			"path_file":     history.File.Path,
@@ -224,7 +228,19 @@ func CreateHistory(c *fiber.Ctx) error {
 	end_date := c.FormValue("end_date")
 	description := c.FormValue("description")
 	productIdStr := c.FormValue("product_id")
+	userIdStr := c.FormValue("user_id")
+	video_title := c.FormValue("video_title")
+	embed := c.FormValue("embed")
 	productId, err := strconv.ParseInt(productIdStr, 10, 64)
+	if err != nil || productId <= 0 {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Invalid Product Id",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
 	if err != nil || productId <= 0 {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusBadRequest,
@@ -242,6 +258,18 @@ func CreateHistory(c *fiber.Ctx) error {
 			Message: "Product Tidak Tersedia",
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	video := models.Video{
+		Title: video_title,
+		Embed: embed,
+	}
+	if err := initialize.DB.Create(&video).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to create video",
+		})
 	}
 
 	if title == "" || description == "" {
@@ -301,7 +329,9 @@ func CreateHistory(c *fiber.Ctx) error {
 		EndDate:     end_date,
 		Description: description,
 		ProductId:   productId,
+		UserId:      userId,
 		FileId:      fileModel.FileId,
+		VideoId:     video.VideoId,
 	}
 
 	// Simpan produk ke dalam database
@@ -351,9 +381,22 @@ func UpdateHistory(c *fiber.Ctx) error {
 	start_date := c.FormValue("start_date")
 	end_date := c.FormValue("end_date")
 	description := c.FormValue("description")
+	video_title := c.FormValue("video_title")
+	embed := c.FormValue("embed")
 	productIdStr := c.FormValue("product_id")
+	userIdStr := c.FormValue("user_id")
 	productId, err := strconv.ParseInt(productIdStr, 10, 64)
 	if err != nil || productId <= 0 {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Invalid or missing Product Id",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	if err != nil || userId <= 0 {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusBadRequest,
 			Status:  "Bad Request",
@@ -464,6 +507,36 @@ func UpdateHistory(c *fiber.Ctx) error {
 	history.Title = title
 	history.Description = description
 	history.ProductId = productId
+	history.UserId = userId
+
+	if history.VideoId != 0 {
+		history.Video.Title = video_title
+		history.Video.Embed = embed
+		if err := initialize.DB.Save(&history.Video).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to update associated video",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+	} else {
+		// Jika belum ada video terkait, buat yang baru
+		newVideo := models.Video{
+			Title: video_title,
+			Embed: embed,
+		}
+		if err := initialize.DB.Create(&newVideo).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to create new video",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+		// Tautkan video baru ke riwayat
+		history.Video = newVideo
+	}
 
 	// Simpan perubahan ke dalam database
 	if err := initialize.DB.Save(&history).Error; err != nil {
@@ -506,6 +579,16 @@ func DeleteHistory(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}
 
+	if history.VideoId != 0 {
+		if err := initialize.DB.Delete(&models.Video{}, history.VideoId).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete associated video",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+	}
 	// Hapus file terkait dari sistem file lokal
 	if history.FileId != 0 {
 		// Memuat data file terkait
