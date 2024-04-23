@@ -75,6 +75,9 @@ func main() {
 	history.Put("/:id", controllers.UpdateHistory)
 	history.Delete("/:id", controllers.DeleteHistory)
 
+	tag := api.Group("/tag")
+	tag.Post("/", controllers.CreateTag)
+
 	app.Listen(":8000")
 
 }

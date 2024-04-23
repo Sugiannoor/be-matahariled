@@ -4,6 +4,7 @@ import (
 	"Matahariled/helpers"
 	"Matahariled/initialize"
 	"Matahariled/models"
+	"fmt"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -69,8 +70,8 @@ func GetCountCategory(c *fiber.Ctx) error {
 
 func CreateCategory(c *fiber.Ctx) error {
 	// Bind request body ke struct Category
-	var category models.Category
-	if err := c.BodyParser(&category); err != nil {
+	var reqBody models.CategoryRequest
+	if err := c.BodyParser(&reqBody); err != nil {
 		// Jika terjadi kesalahan dalam memparsing body, kirim respons kesalahan ke klien
 		response := helpers.GeneralResponse{
 			Code:   400,
@@ -81,7 +82,7 @@ func CreateCategory(c *fiber.Ctx) error {
 	}
 
 	// Validasi data kategori
-	if err := validate.Struct(&category); err != nil {
+	if err := validate.Struct(&reqBody); err != nil {
 		errors := make(map[string][]string)
 		for _, err := range err.(validator.ValidationErrors) {
 			field := err.Field()
@@ -101,6 +102,24 @@ func CreateCategory(c *fiber.Ctx) error {
 			Error:  errors,
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	category := models.Category{
+		Category: reqBody.Category,
+	}
+	if len(reqBody.TagIDs) > 0 {
+		for _, tagID := range reqBody.TagIDs {
+			var tag models.Tag
+			if err := initialize.DB.First(&tag, tagID).Error; err != nil {
+				response := helpers.ResponseMassage{
+					Code:    fiber.StatusBadRequest,
+					Status:  "Bad Request",
+					Message: fmt.Sprintf("Tag with ID %d not found", tagID),
+				}
+				return c.Status(fiber.StatusBadRequest).JSON(response)
+			}
+			category.Tags = append(category.Tags, tag)
+		}
 	}
 
 	// Simpan kategori ke database

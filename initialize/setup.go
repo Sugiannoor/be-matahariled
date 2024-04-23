@@ -22,5 +22,6 @@ func ConnectDatabase() {
 	db.AutoMigrate(&models.Contract{})
 	db.AutoMigrate(&models.History{})
 	db.AutoMigrate(&models.Video{})
+	db.AutoMigrate(&models.Tag{})
 	DB = db
 }
