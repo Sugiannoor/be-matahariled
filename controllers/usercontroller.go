@@ -6,6 +6,7 @@ import (
 	"Matahariled/models"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 var validate *validator.Validate
@@ -521,4 +523,158 @@ func UserDatatable(c *fiber.Ctx) error {
 		Status: "OK",
 		Data:   response,
 	})
+}
+
+func CreateUserForm(c *fiber.Ctx) error {
+	// Ambil data pengguna dari form
+	fullName := c.FormValue("full_name")
+	userName := c.FormValue("username")
+	phoneNumber := c.FormValue("phone_number")
+	password := c.FormValue("password")
+	email := c.FormValue("email")
+	address := c.FormValue("address")
+	role := c.FormValue("role")
+
+	// Simpan file yang diunggah ke folder public
+	file, err := c.FormFile("file")
+	if err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "File is required",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	// Generate nama unik untuk file yang diunggah
+	filename := uuid.New().String() + filepath.Ext(file.Filename)
+
+	// Simpan file ke direktori publik
+	if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save file",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat entitas File untuk disimpan dalam database
+	fileModel := models.File{
+		Path:      fmt.Sprintf("/public/%s", filename),
+		File_name: filename,
+		Size:      strconv.FormatInt(file.Size, 10),
+		Format:    filepath.Ext(file.Filename),
+	}
+
+	// Simpan file ke dalam database
+	if err := initialize.DB.Create(&fileModel).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save file data",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to hash password",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat entitas pengguna
+	user := models.User{
+		FullName:    fullName,
+		UserName:    userName,
+		PhoneNumber: phoneNumber,
+		Password:    string(hashedPassword),
+		Email:       email,
+		Address:     &address,
+		Role:        role,
+		FileId:      fileModel.FileId,
+	}
+
+	// Simpan pengguna ke dalam database
+	if err := initialize.DB.Create(&user).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save user",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kirim respons sukses
+	response := helpers.ResponseMassage{
+		Code:    fiber.StatusOK,
+		Status:  "OK",
+		Message: "User saved successfully",
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
+func DeleteUserT(c *fiber.Ctx) error {
+	UserId, err := strconv.ParseInt(c.Query("id"), 10, 64)
+	if err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Invalid User ID",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	// Ambil data produk yang akan dihapus dari database
+	var User models.User
+	if err := initialize.DB.Preload("File").First(&User, UserId).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusNotFound,
+			Status:  "Not Found",
+			Message: "User not found",
+		}
+		return c.Status(fiber.StatusNotFound).JSON(response)
+	}
+
+	// Hapus produk dari database
+	if err := initialize.DB.Delete(&User).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to delete User",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Jika produk memiliki file terkait, hapus file tersebut
+	if err := os.Remove("." + User.File.Path); err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Gagal Menghapus Data Dilocal",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Hapus entitas file terkait dari basis data
+	if err := initialize.DB.Delete(&User.File).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+	// Kirim respons sukses
+	response := helpers.ResponseMassage{
+		Code:    fiber.StatusOK,
+		Status:  "OK",
+		Message: "User Berhasil dihapus",
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
 }

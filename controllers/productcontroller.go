@@ -536,3 +536,4 @@ func DeleteProduct(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }
+

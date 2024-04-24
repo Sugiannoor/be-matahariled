@@ -641,3 +641,62 @@ func DeleteHistory(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }
+
+func GetAllUserPortfolios(c *fiber.Ctx) error {
+	// Ambil semua data history dari database
+	var histories []models.History
+	if err := initialize.DB.Preload("User").Preload("User.File").Find(&histories).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to fetch portfolios",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Siapkan slice untuk menyimpan data portofolio dan informasi pengguna terkait
+	var userPortfolios []struct {
+		HistoryID    int64  `json:"history_id"`
+		Title        string `json:"title"`
+		User         struct {
+			FullName     string `json:"full_name"`
+			UserFilePath string `json:"path_file_user"`
+		} `json:"user"`
+	}
+
+	// Looping melalui setiap entri portofolio dan menambahkan informasi pengguna terkait
+	for _, history := range histories {
+		userPortfolios = append(userPortfolios, struct {
+			HistoryID    int64  `json:"history_id"`
+			Title        string `json:"title"`
+			User         struct {
+				FullName     string `json:"full_name"`
+				UserFilePath string `json:"path_file_user"`
+			} `json:"user"`
+		}{
+			HistoryID: history.HistoryId,
+			Title:     history.Title,
+			User: struct {
+				FullName     string `json:"full_name"`
+				UserFilePath string `json:"path_file_user"`
+			}{
+				FullName:     history.User.FullName,
+				UserFilePath: history.User.File.Path,
+			},
+		})
+	}
+	if len(userPortfolios) == 0 {
+		return c.JSON(helpers.GeneralResponse{
+			Code:   fiber.StatusOK,
+			Status: "OK",
+			Data:   []interface{}{},
+		})
+	}
+
+	// Kirim respons dengan daftar portofolio dan informasi pengguna terkait
+	return c.JSON(helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   userPortfolios,
+	})
+}

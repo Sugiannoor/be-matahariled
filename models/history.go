@@ -32,10 +32,3 @@ type HistoryResponse struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
-
-type HistoryCreateRequest struct {
-	Title       string `json:"name" form:"name" validate:"required"`
-	Description string `json:"description" form:"description" validate:"required"`
-	File        File   `json:"file" form:"file" validate:"required"`
-	ProductId   int64  `json:"product_id" form:"product_id" validate:"required"`
-}

@@ -29,16 +29,17 @@ func main() {
 	auth.Get("/profile", controllers.GetProfileHandler)
 	auth.Post("/register", controllers.CreateUser)
 	auth.Post("/login", controllers.LoginHandler)
-
+	
 	// User
 	user := api.Group("/user")
-	user.Delete("/", controllers.DeleteUser)
+	user.Delete("/", controllers.DeleteUserT)
 	user.Get("/all", middleware.JWTMiddleware("Admin", "SuperAdmin"), controllers.Index)
 	user.Get("/count", controllers.GetCountUser)
 	user.Put("/", controllers.EditUser)
 	user.Get("/", controllers.GetUserById)
 	user.Get("/datatable", controllers.UserDatatable)
 	user.Get("/label", controllers.GetUsersLabel)
+	user.Post("/", controllers.CreateUserForm)
 	// Group Products
 	product := api.Group("/product")
 	product.Get("/all", controllers.GetAllProducts)
@@ -70,6 +71,7 @@ func main() {
 	history.Get("/all", controllers.GetAllHistories)
 	history.Get("/count", controllers.GetCountHistory)
 	history.Get("/datatable", controllers.GetDatatableHistories)
+	history.Get("/user", controllers.GetAllUserPortfolios)
 	history.Get("/:id", controllers.GetHistoryById)
 	history.Post("/", controllers.CreateHistory)
 	history.Put("/:id", controllers.UpdateHistory)
@@ -77,6 +79,10 @@ func main() {
 
 	tag := api.Group("/tag")
 	tag.Post("/", controllers.CreateTag)
+
+	video := api.Group("/video")
+	video.Get("/all", controllers.GetAllVideos)
+	video.Get("/datatable", controllers.GetDatatableVideos)
 
 	app.Listen(":8000")
 
