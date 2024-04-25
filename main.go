@@ -29,7 +29,7 @@ func main() {
 	auth.Get("/profile", controllers.GetProfileHandler)
 	auth.Post("/register", controllers.CreateUser)
 	auth.Post("/login", controllers.LoginHandler)
-	
+
 	// User
 	user := api.Group("/user")
 	user.Delete("/", controllers.DeleteUserT)
@@ -79,6 +79,8 @@ func main() {
 
 	tag := api.Group("/tag")
 	tag.Post("/", controllers.CreateTag)
+	tag.Get("/", controllers.GetAllTag)
+	tag.Get("/label", controllers.GetTagLabel)
 
 	video := api.Group("/video")
 	video.Get("/all", controllers.GetAllVideos)

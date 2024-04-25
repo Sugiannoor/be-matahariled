@@ -177,3 +177,55 @@ func UpdateTag(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }
+
+func GetAllTag(c *fiber.Ctx) error {
+	// Ambil semua video dari database
+	var tag []models.Tag
+	if err := initialize.DB.Find(&tag).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to fetch videos",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   tag,
+	}
+	return c.JSON(response)
+}
+
+func GetTagLabel(c *fiber.Ctx) error {
+	// Ambil semua pengguna dari database
+	var tags []models.Tag
+	if err := initialize.DB.Find(&tags).Error; err != nil {
+		// Jika terjadi kesalahan saat mengambil pengguna, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat respons dengan format yang diinginkan
+	var userOptions []map[string]interface{}
+	for _, tag := range tags {
+		option := map[string]interface{}{
+			"value": tag.TagId,
+			"label": tag.Tag, // Atur atribut yang sesuai dengan nama pengguna
+		}
+		userOptions = append(userOptions, option)
+	}
+
+	// Kembalikan respons sukses dengan data pengguna ke klien
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   userOptions,
+	}
+	return c.JSON(response)
+}
