@@ -660,7 +660,7 @@ func GetAllUserPortfolios(c *fiber.Ctx) error {
 		Title        string `json:"title"`
 		User         struct {
 			FullName     string `json:"full_name"`
-			UserFilePath string `json:"path_file_user"`
+			UserFilePath string `json:"photo"`
 		} `json:"user"`
 	}
 
@@ -671,14 +671,14 @@ func GetAllUserPortfolios(c *fiber.Ctx) error {
 			Title        string `json:"title"`
 			User         struct {
 				FullName     string `json:"full_name"`
-				UserFilePath string `json:"path_file_user"`
+				UserFilePath string `json:"photo"`
 			} `json:"user"`
 		}{
 			HistoryID: history.HistoryId,
 			Title:     history.Title,
 			User: struct {
 				FullName     string `json:"full_name"`
-				UserFilePath string `json:"path_file_user"`
+				UserFilePath string `json:"photo"`
 			}{
 				FullName:     history.User.FullName,
 				UserFilePath: history.User.File.Path,

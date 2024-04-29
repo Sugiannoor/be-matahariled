@@ -46,9 +46,9 @@ func main() {
 	product.Get("/count", controllers.GetCountProduct)
 	product.Get("/datatable", controllers.GetDatatableProducts)
 	product.Get("/label", controllers.GetProductsLabel)
-	product.Post("/", controllers.CreateProduct)
+	product.Post("/", controllers.CreateProductT)
 	product.Put("/:id", controllers.UpdateProduct)
-	product.Delete("/", controllers.DeleteProduct)
+	product.Delete("/", controllers.DeleteProductT)
 	product.Get("/:id", controllers.GetProductById)
 	// Group Category
 	category := api.Group("/category")
@@ -85,6 +85,9 @@ func main() {
 	video := api.Group("/video")
 	video.Get("/all", controllers.GetAllVideos)
 	video.Get("/datatable", controllers.GetDatatableVideos)
+
+	gallery:= api.Group("/gallery")
+	gallery.Get("/:id", controllers.GetGalleriesByProductID)
 
 	app.Listen(":8000")
 
