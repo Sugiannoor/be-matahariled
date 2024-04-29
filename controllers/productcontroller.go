@@ -537,3 +537,126 @@ func DeleteProduct(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(response)
 }
 
+func CreateProductT(c *fiber.Ctx) error {
+	// Ambil data produk dari form
+	title := c.FormValue("name")
+	description := c.FormValue("description")
+	specification := c.FormValue("specification")
+	categoryId, err := strconv.ParseInt(c.FormValue("category_id"), 10, 64)
+	if err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Invalid category ID",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	// Simpan file yang diunggah ke folder public
+	file, err := c.FormFile("file")
+	if err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "File is required",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	// Generate nama unik untuk file yang diunggah
+	filename := uuid.New().String() + filepath.Ext(file.Filename)
+
+	// Simpan file ke direktori publik
+	if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save file",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat entitas File untuk disimpan dalam database
+	fileModel := models.File{
+		Path:      fmt.Sprintf("/public/%s", filename),
+		File_name: filename,
+		Size:      strconv.FormatInt(file.Size, 10),
+		Format:    filepath.Ext(file.Filename),
+	}
+
+	// Simpan file ke dalam database
+	if err := initialize.DB.Create(&fileModel).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save file data",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	var galleryFiles []models.Gallery
+	gallery, _ := c.FormFile("gallery[]")
+	if gallery != nil {
+		for _, file := range galleryFiles {
+			// Generate nama unik untuk setiap file galeri yang diunggah
+			galleryFilename := uuid.New().String() + filepath.Ext(file.Gallery_name)
+
+			// Simpan file galeri ke direktori publik
+			if err := c.SaveFile(gallery, fmt.Sprintf("./public/%s", galleryFilename)); err != nil {
+				response := helpers.ResponseMassage{
+					Code:    fiber.StatusInternalServerError,
+					Status:  "Internal Server Error",
+					Message: "Failed to save gallery file",
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(response)
+			}
+
+			// Buat entitas File untuk setiap file galeri yang akan disimpan dalam database
+			galleryFile := models.Gallery{
+				Path:         fmt.Sprintf("/public/%s", galleryFilename),
+				Gallery_name: galleryFilename,
+				Size:         strconv.FormatInt(gallery.Size, 10),
+				Format:       filepath.Ext(file.Gallery_name),
+			}
+
+			galleryFiles = append(galleryFiles, galleryFile)
+		}
+
+		// Simpan file galeri ke dalam database
+		if err := initialize.DB.Create(&galleryFiles).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to save gallery files data",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+	}
+
+	// Buat entitas Product
+	product := models.Product{
+		Title:         title,
+		Specification: specification,
+		Description:   description,
+		CategoryId:    categoryId,
+		FileId:        fileModel.FileId,
+	}
+
+	// Simpan produk ke dalam database
+	if err := initialize.DB.Create(&product).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save product",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kirim respons sukses
+	response := helpers.ResponseMassage{
+		Code:    fiber.StatusOK,
+		Status:  "OK",
+		Message: "Product saved successfully",
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
+}

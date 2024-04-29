@@ -12,9 +12,10 @@ type Product struct {
 	CreatedAt     time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt     time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 	FileId        int64     `json:"file_id"`
-	File          File      `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASADE" json:"file"`
+	File          File      `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASCADE" json:"file"`
 	CategoryId    int64     `json:"category_id" form:"category_id"`
 	Category      Category  `json:"category"`
+	Galleries     []Gallery `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASCADE" json:"galleries"`
 }
 
 type ProductResponse struct {
@@ -28,20 +29,4 @@ type ProductResponse struct {
 	CategoryId    int64     `json:"category_id"`
 	PathFile      string    `json:"path_file"`
 	Category      string    `json:"category"`
-}
-
-type ProductCreateRequest struct {
-	Title       string `json:"name" form:"name" validate:"required"`
-	Description string `json:"description" form:"description" validate:"required"`
-	File        File   `json:"file" form:"file" validate:"required"`
-	CategoryId  int64  `json:"category_id" form:"category_id" validate:"required"`
-}
-
-type ProductEditRequest struct {
-	ProductId   int64  `json:"product_id" form:"product_id" validate:"required"`
-	Title       string `json:"title" validate:"required"`
-	Description string `json:"description" validate:"required"`
-	FileId      int64  `gorm:"index" json:"file_id"`
-	File        File   `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASADE" json:"file"`
-	CategoryId  int64  `json:"category_id" form:"category_id" validate:"required"`
 }
