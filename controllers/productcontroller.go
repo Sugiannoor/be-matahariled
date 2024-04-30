@@ -676,7 +676,7 @@ func DeleteProductT(c *fiber.Ctx) error {
 
 	// Ambil data produk yang akan dihapus dari database
 	var product models.Product
-	if err := initialize.DB.Preload("Galleries").Preload("File").First(&product, productId).Error; err != nil {
+	if err := initialize.DB.Preload("Gallery").Preload("File").First(&product, productId).Error; err != nil {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusNotFound,
 			Status:  "Not Found",
