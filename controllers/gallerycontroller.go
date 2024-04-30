@@ -21,12 +21,13 @@ func GetGalleryById(c *fiber.Ctx) error {
 	if err := initialize.DB.Where("product_id = ?", productId).Find(&gallery).Error; err != nil {
 		// Jika galeri tidak ditemukan, kirim respons not found
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response := helpers.ResponseMassage{
-				Code:    fiber.StatusNotFound,
-				Status:  "Not Found",
-				Message: "Gallery not found for product",
+			// Mengirimkan respons sukses dengan data galeri kosong
+			response := helpers.GeneralResponse{
+				Code:   fiber.StatusOK,
+				Status: "OK",
+				Data:   []string{},
 			}
-			return c.Status(fiber.StatusNotFound).JSON(response)
+			return c.Status(fiber.StatusOK).JSON(response)
 		}
 		// Jika terjadi kesalahan lain saat mengambil galeri, kirim respons kesalahan ke klien
 		response := helpers.ResponseMassage{
@@ -42,7 +43,9 @@ func GetGalleryById(c *fiber.Ctx) error {
 	for _, gallery := range gallery {
 		paths = append(paths, gallery.Path)
 	}
-
+	if len(paths) == 0 {
+		paths = []string{}
+	}
 	// Mengirimkan respons sukses dengan data path galeri yang ditemukan
 	response := helpers.GeneralResponse{
 		Code:   fiber.StatusOK,
