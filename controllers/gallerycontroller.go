@@ -11,10 +11,7 @@ import (
 )
 
 func GetGalleryById(c *fiber.Ctx) error {
-	// Ambil ID produk dari parameter URL
 	productId := c.Params("id")
-
-	// Buat variabel untuk menyimpan galeri yang sesuai dengan ID produk
 	var gallery []models.Gallery
 
 	// Cari galeri berdasarkan ID produk

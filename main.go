@@ -73,6 +73,7 @@ func main() {
 	history.Get("/datatable", controllers.GetDatatableHistories)
 	history.Get("/user", controllers.GetAllUserPortfolios)
 	history.Get("/:id", controllers.GetHistoryById)
+	history.Get("/product/:id", controllers.GetHistoryByIdProduct)
 	history.Post("/", controllers.CreateHistory)
 	history.Put("/:id", controllers.UpdateHistory)
 	history.Delete("/:id", controllers.DeleteHistory)

@@ -700,3 +700,47 @@ func GetAllUserPortfolios(c *fiber.Ctx) error {
 		Data:   userPortfolios,
 	})
 }
+
+func GetHistoryByIdProduct(c *fiber.Ctx) error {
+	// Ambil ID produk dari parameter URL
+	productId := c.Params("id")
+
+	// Ambil semua data history terkait dengan ID produk dari database
+	var histories []models.History
+	if err := initialize.DB.Preload("Product").Preload("Product.Category").Preload("File").Where("product_id = ?", productId).Find(&histories).Error; err != nil {
+		// Jika terjadi kesalahan saat mengambil history, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to fetch histories",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Membuat slice untuk menyimpan respons history
+	historyResponses := make([]models.HistoryResponse, len(histories))
+
+	// Mengisi data respons history
+	for i, history := range histories {
+		historyResponses[i] = models.HistoryResponse{
+			HistoryId:    history.HistoryId,
+			Title:        history.Title,
+			Description:  history.Description,
+			StartDate:    history.StartDate,
+			EndDate:      history.EndDate,
+			ProductName:  history.Product.Title,
+			CategoryName: history.Product.Category.Category,
+			PathFile:     history.File.Path,
+			CreatedAt:    history.CreatedAt,
+			UpdatedAt:    history.UpdatedAt,
+		}
+	}
+
+	// Mengirimkan respons sukses dengan daftar history
+	response := helpers.ResponseGetAll{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   historyResponses,
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
+}

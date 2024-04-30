@@ -13,7 +13,7 @@ type History struct {
 	FileId      int64     `gorm:"index" json:"file_id"`
 	File        File      `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASCADE" json:"file"`
 	VideoId     int64     `gorm:"index" json:"video_id"`
-	Video       Video     `gorm:"constraint:onDelete:CASCADE;OnUpdate:CASCADE" json:"video"`
+	Video       Video     `json:"video"`
 	UserId      int64     `gorm:"index" json:"user_id"`
 	User        User      `gorm:"constraint:onDelete:CASCADE;OnUpdate:CASCADE" json:"user"`
 	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
