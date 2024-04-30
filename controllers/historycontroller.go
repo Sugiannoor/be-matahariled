@@ -656,29 +656,29 @@ func GetAllUserPortfolios(c *fiber.Ctx) error {
 
 	// Siapkan slice untuk menyimpan data portofolio dan informasi pengguna terkait
 	var userPortfolios []struct {
-		HistoryID    int64  `json:"history_id"`
-		Title        string `json:"title"`
-		User         struct {
+		HistoryID int64  `json:"history_id"`
+		Title     string `json:"title"`
+		User      struct {
 			FullName     string `json:"full_name"`
-			UserFilePath string `json:"path_file_user"`
+			UserFilePath string `json:"photo"`
 		} `json:"user"`
 	}
 
 	// Looping melalui setiap entri portofolio dan menambahkan informasi pengguna terkait
 	for _, history := range histories {
 		userPortfolios = append(userPortfolios, struct {
-			HistoryID    int64  `json:"history_id"`
-			Title        string `json:"title"`
-			User         struct {
+			HistoryID int64  `json:"history_id"`
+			Title     string `json:"title"`
+			User      struct {
 				FullName     string `json:"full_name"`
-				UserFilePath string `json:"path_file_user"`
+				UserFilePath string `json:"photo"`
 			} `json:"user"`
 		}{
 			HistoryID: history.HistoryId,
 			Title:     history.Title,
 			User: struct {
 				FullName     string `json:"full_name"`
-				UserFilePath string `json:"path_file_user"`
+				UserFilePath string `json:"photo"`
 			}{
 				FullName:     history.User.FullName,
 				UserFilePath: history.User.File.Path,

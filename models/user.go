@@ -13,8 +13,8 @@ type User struct {
 	Email       string     `gorm:"type:varchar(100)" json:"email" validate:"required"`
 	Address     *string    `gorm:"type:varchar(300)" json:"address"`
 	Role        string     `gorm:"type:ENUM('Admin', 'Customer', 'SuperAdmin'); default:'Customer'" json:"role"`
-	FileId        int64     `json:"file_id"`
-	File          File      `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASADE" json:"file"`
+	FileId      int64      `json:"file_id"`
+	File        File       `gorm:"constraint:OnDelete:CASCADE;OnUpdate:CASADE" json:"file"`
 	CreatedAt   *time.Time `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   *time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 }

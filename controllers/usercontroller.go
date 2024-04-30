@@ -335,10 +335,17 @@ func CreateUser(c *fiber.Ctx) error {
 	}
 
 	// Simpan hash password ke field Password
-	newUser.Password = string(hashedPassword)
 
+	user := models.User{
+		FullName:    newUser.FullName,
+		UserName:    newUser.UserName,
+		PhoneNumber: newUser.PhoneNumber,
+		Password:    string(hashedPassword),
+		Email:       newUser.Email,
+		Role:        newUser.Role,
+	}
 	// Buat pengguna baru di database
-	if err := initialize.DB.Create(&newUser).Error; err != nil {
+	if err := initialize.DB.Create(&user).Error; err != nil {
 		// Jika terjadi kesalahan dalam membuat pengguna baru, kirim respons kesalahan ke klien
 		response := helpers.ResponseMassage{
 			Code:    500,

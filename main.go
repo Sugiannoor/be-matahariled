@@ -27,8 +27,8 @@ func main() {
 	// Group Auth
 	auth := api.Group("/auth")
 	auth.Get("/profile", controllers.GetProfileHandler)
-	auth.Post("/register", controllers.CreateUser)
 	auth.Post("/login", controllers.LoginHandler)
+	auth.Post("/register", controllers.CreateUser)
 
 	// User
 	user := api.Group("/user")
@@ -85,6 +85,9 @@ func main() {
 	video := api.Group("/video")
 	video.Get("/all", controllers.GetAllVideos)
 	video.Get("/datatable", controllers.GetDatatableVideos)
+
+	gallery := api.Group("/gallery")
+	gallery.Get("/:id", controllers.GetGalleryById)
 
 	app.Listen(":8000")
 
