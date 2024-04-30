@@ -87,7 +87,7 @@ func main() {
 	video.Get("/datatable", controllers.GetDatatableVideos)
 
 	gallery := api.Group("/gallery")
-	gallery.Get("/:id", controllers.GetGalleriesByProductID)
+	gallery.Get("/:id", controllers.GetGalleryById)
 
 	app.Listen(":8000")
 
