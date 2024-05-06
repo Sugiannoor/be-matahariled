@@ -6,6 +6,7 @@ import (
 	"Matahariled/models"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -107,19 +108,26 @@ func GetCountProduct(c *fiber.Ctx) error {
 }
 
 func GetDatatableProducts(c *fiber.Ctx) error {
-	// Ambil nilai parameter limit, sort, sort_by, dan search dari query string
+	// Ambil nilai parameter limit, page, sort, sort_by, dan search dari query string
 	limit, _ := strconv.Atoi(c.Query("limit"))
+	page, _ := strconv.Atoi(c.Query("page"))
 	sort := c.Query("sort")
 	sortBy := c.Query("sort_by")
 	search := c.Query("search")
-	category_id := c.Query("category_id")
+	categoryID := c.Query("category_id")
 
 	// Tentukan default nilai jika parameter tidak ada
 	if limit <= 0 {
 		limit = 10 // Nilai default untuk limit adalah 10
 	}
+	if page <= 0 {
+		page = 1 // Halaman default adalah 1
+	}
 
-	// Lakukan pengambilan data dari database dengan menggunakan parameter limit, sort, dan sort_by
+	// Hitung offset berdasarkan halaman dan limit
+	offset := (page - 1) * limit
+
+	// Lakukan pengambilan data dari database dengan menggunakan parameter limit, offset, sort, dan sort_by
 	var products []models.Product
 	query := initialize.DB.Preload("File").Preload("Category").Model(&models.Product{})
 
@@ -133,12 +141,12 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 		query = query.Order(fmt.Sprintf("%s %s", sortBy, sort))
 	}
 
-	if category_id != "" {
-		query = query.Where("category_id = ?", category_id)
+	if categoryID != "" {
+		query = query.Where("category_id = ?", categoryID)
 	}
 
-	// Limit jumlah data yang diambil sesuai dengan nilai parameter limit
-	query = query.Limit(limit)
+	// Limit jumlah data yang diambil sesuai dengan nilai parameter limit dan offset
+	query = query.Limit(limit).Offset(offset)
 
 	// Lakukan pengambilan data
 	if err := query.Find(&products).Error; err != nil {
@@ -151,17 +159,31 @@ func GetDatatableProducts(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
+	// Hitung total jumlah record tanpa paginasi
+	var totalRecords int64
+	if err := initialize.DB.Model(&models.Product{}).Count(&totalRecords).Error; err != nil {
+		response := helpers.GeneralResponse{
+			Code:   500,
+			Status: "Internal Server Error",
+			Data:   nil,
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Hitung total jumlah halaman berdasarkan total jumlah record dan limit
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(limit)))
+
 	response := helpers.DataTableResponse{
-		CurrentPage:  1,                                  // Nomor halaman saat ini (default 1)
-		FirstPageURL: "",                                 // URL halaman pertama
-		From:         1,                                  // Nomor record pertama pada halaman saat ini
-		LastPage:     1,                                  // Total jumlah halaman (default 1)
-		LastPageURL:  "",                                 // URL halaman terakhir
-		NextPageURL:  "",                                 // URL halaman berikutnya
-		PrevPageURL:  "",                                 // URL halaman sebelumnya
-		To:           len(products),                      // Nomor record terakhir pada halaman saat ini
-		Total:        len(products),                      // Total jumlah record
-		Data:         make([]interface{}, len(products)), // Buat slice interface{} dengan panjang yang sama dengan users
+		CurrentPage:  page,
+		FirstPageURL: "", // Anda bisa menentukan URL halaman pertama jika perlu
+		From:         offset + 1,
+		LastPage:     totalPages,
+		LastPageURL:  "", // Anda bisa menentukan URL halaman terakhir jika perlu
+		NextPageURL:  "", // Anda bisa menentukan URL halaman berikutnya jika perlu
+		PrevPageURL:  "", // Anda bisa menentukan URL halaman sebelumnya jika perlu
+		To:           offset + len(products),
+		Total:        int(totalRecords),
+		Data:         make([]interface{}, len(products)),
 	}
 
 	for i, product := range products {
@@ -614,43 +636,47 @@ func CreateProductT(c *fiber.Ctx) error {
 	}
 
 	// Simpan galeri ke dalam database
-	form, _ := c.MultipartForm()
-	files := form.File["gallery[]"]
-	var galleries []models.Gallery
-	for _, file := range files {
-		// Generate nama unik untuk file yang diunggah
-		filename := uuid.New().String() + filepath.Ext(file.Filename)
+	form, err := c.MultipartForm()
+	if err != nil {
+	} else {
 
-		// Simpan file ke direktori publik
-		if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
+		files := form.File["gallery[]"]
+		var galleries []models.Gallery
+		for _, file := range files {
+			// Generate nama unik untuk file yang diunggah
+			filename := uuid.New().String() + filepath.Ext(file.Filename)
+
+			// Simpan file ke direktori publik
+			if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
+				response := helpers.ResponseMassage{
+					Code:    fiber.StatusInternalServerError,
+					Status:  "Internal Server Error",
+					Message: "Failed to save gallery files",
+				}
+				return c.Status(fiber.StatusInternalServerError).JSON(response)
+			}
+
+			// Buat entitas Gallery untuk disimpan dalam database
+			gallery := models.Gallery{
+				Path:         fmt.Sprintf("/public/%s", filename),
+				Gallery_name: file.Filename,
+				Size:         strconv.FormatInt(file.Size, 10),
+				Format:       filepath.Ext(file.Filename),
+				ProductId:    product.ProductId, // Gunakan ID produk yang baru dibuat
+			}
+
+			galleries = append(galleries, gallery)
+		}
+
+		// Simpan galeri ke dalam database
+		if err := initialize.DB.Create(&galleries).Error; err != nil {
 			response := helpers.ResponseMassage{
 				Code:    fiber.StatusInternalServerError,
 				Status:  "Internal Server Error",
-				Message: "Failed to save gallery files",
+				Message: "Failed to save gallery data",
 			}
 			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
-
-		// Buat entitas Gallery untuk disimpan dalam database
-		gallery := models.Gallery{
-			Path:         fmt.Sprintf("/public/%s", filename),
-			Gallery_name: file.Filename,
-			Size:         strconv.FormatInt(file.Size, 10),
-			Format:       filepath.Ext(file.Filename),
-			ProductId:    product.ProductId, // Gunakan ID produk yang baru dibuat
-		}
-
-		galleries = append(galleries, gallery)
-	}
-
-	// Simpan galeri ke dalam database
-	if err := initialize.DB.Create(&galleries).Error; err != nil {
-		response := helpers.ResponseMassage{
-			Code:    fiber.StatusInternalServerError,
-			Status:  "Internal Server Error",
-			Message: "Failed to save gallery data",
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
 	// Kirim respons sukses

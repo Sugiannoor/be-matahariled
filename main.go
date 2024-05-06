@@ -26,14 +26,14 @@ func main() {
 
 	// Group Auth
 	auth := api.Group("/auth")
-	auth.Get("/profile", controllers.GetProfileHandler)
-	auth.Post("/login", controllers.LoginHandler)
+	auth.Get("/profile", controllers.GetProfile)
+	auth.Post("/login", controllers.LoginUser)
 	auth.Post("/register", controllers.CreateUser)
 
 	// User
 	user := api.Group("/user")
 	user.Delete("/", controllers.DeleteUserT)
-	user.Get("/all", middleware.JWTMiddleware("Admin", "SuperAdmin"), controllers.Index)
+	user.Get("/all", middleware.MultiRoleMiddleware("Admin", "SuperAdmin"), controllers.Index)
 	user.Get("/count", controllers.GetCountUser)
 	user.Put("/", controllers.EditUser)
 	user.Get("/", controllers.GetUserById)

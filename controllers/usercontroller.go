@@ -37,7 +37,7 @@ func Index(c *fiber.Ctx) error {
 
 	return c.JSON(response)
 }
-func LoginHandler(c *fiber.Ctx) error {
+func LoginUser(c *fiber.Ctx) error {
 	// Parse body permintaan
 	var req models.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -66,14 +66,17 @@ func LoginHandler(c *fiber.Ctx) error {
 			Message: "Invalid email or password",
 		})
 	}
-
-	// Buat token JWT
 	token := jwt.New(jwt.SigningMethodHS256)
 
 	// Set klaim JWT
 	claims := token.Claims.(jwt.MapClaims)
 	claims["user_id"] = user.UserId
+	claims["username"] = user.UserName
 	claims["email"] = user.Email
+	claims["phone_number"] = user.PhoneNumber
+	claims["fullname"] = user.FullName
+	claims["address"] = user.Address
+	claims["path"] = user.File.Path
 	claims["role"] = user.Role
 	claims["exp"] = time.Now().Add(time.Hour * 24).Unix() // Token berlaku selama 24 jam
 
@@ -196,68 +199,61 @@ func GetUserById(c *fiber.Ctx) error {
 	}
 	return c.JSON(response)
 }
-func GetProfileHandler(c *fiber.Ctx) error {
-	// Ambil token dari header Authorization
-	authHeader := c.Get("Authorization")
-	tokenString := strings.Replace(authHeader, "Bearer ", "", 1)
+func GetProfile(c *fiber.Ctx) error {
+	tokenString := c.Get("Authorization")
 
-	// Parse dan verifikasi token
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		// Verifikasi metode tanda tangan
+	// Periksa apakah token kosong
+	if tokenString == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Access Token Diperlukan",
+		})
+	}
+
+	// Pisahkan nilai token JWT dari string "Bearer <token>"
+	tokenParts := strings.Split(tokenString, " ")
+	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Format Token Tidak Valid",
+		})
+	}
+	jwtToken := tokenParts[1]
+
+	var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+	// Parse token JWT
+	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.ErrSignatureInvalid
+			return nil, fmt.Errorf("metode signing tidak valid: %v", token.Header["alg"])
 		}
-		// Return secret key yang sama yang digunakan untuk menandatangani token
-		return []byte(os.Getenv("JWT_SECRET")), nil
+		return jwtSecret, nil
 	})
+
+	// Periksa apakah terjadi kesalahan saat parsing token
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
-			Code:    fiber.StatusUnauthorized,
-			Status:  "Unauthorized",
-			Message: "Invalid or expired token",
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Terjadi Kesalahan",
 		})
 	}
 
 	// Periksa apakah token valid
 	if !token.Valid {
-		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
-			Code:    fiber.StatusUnauthorized,
-			Status:  "Unauthorized",
-			Message: "Invalid or expired token",
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"message": "Token Tidak Valid",
 		})
 	}
 
-	// Ekstrak klaim JWT
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
-			Code:    fiber.StatusUnauthorized,
-			Status:  "Unauthorized",
-			Message: "Invalid token claims",
-		})
+	// Ambil klaim dari token
+	claims := token.Claims.(jwt.MapClaims)
+	// Ambil informasi pengguna dari klaim token
+	user := models.User{
+		UserId:      int64(claims["user_id"].(float64)),
+		UserName:    claims["username"].(string),
+		FullName:    claims["fullname"].(string),
+		Email:       claims["email"].(string),
+		PhoneNumber: claims["phone_number"].(string),
+		Role:        claims["role"].(string),
 	}
 
-	// Ambil ID pengguna dari klaim JWT
-	userID, ok := claims["user_id"].(float64)
-	if !ok {
-		return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
-			Code:    fiber.StatusUnauthorized,
-			Status:  "Unauthorized",
-			Message: "Invalid user ID in token claims",
-		})
-	}
-
-	// Ambil profil pengguna dari database berdasarkan ID pengguna
-	var user models.User
-	if err := initialize.DB.First(&user, int(userID)).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(helpers.ResponseMassage{
-			Code:    fiber.StatusInternalServerError,
-			Status:  "Internal Server Error",
-			Message: "Failed to get user profile",
-		})
-	}
-
-	// Kirim profil pengguna dalam respons
+	// Kirim data pengguna dalam respons
 	return c.JSON(helpers.GeneralResponse{
 		Code:   fiber.StatusOK,
 		Status: "OK",
@@ -542,46 +538,41 @@ func CreateUserForm(c *fiber.Ctx) error {
 	address := c.FormValue("address")
 	role := c.FormValue("role")
 
+	var fileModel models.File
+
 	// Simpan file yang diunggah ke folder public
 	file, err := c.FormFile("file")
 	if err != nil {
-		response := helpers.ResponseMassage{
-			Code:    fiber.StatusBadRequest,
-			Status:  "Bad Request",
-			Message: "File is required",
+
+	} else {
+
+		filename := uuid.New().String() + filepath.Ext(file.Filename)
+
+		// Simpan file ke direktori publik
+		if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to save file",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
-		return c.Status(fiber.StatusBadRequest).JSON(response)
-	}
-
-	// Generate nama unik untuk file yang diunggah
-	filename := uuid.New().String() + filepath.Ext(file.Filename)
-
-	// Simpan file ke direktori publik
-	if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
-		response := helpers.ResponseMassage{
-			Code:    fiber.StatusInternalServerError,
-			Status:  "Internal Server Error",
-			Message: "Failed to save file",
+		// Buat entitas File untuk disimpan dalam database
+		fileModel := models.File{
+			Path:      fmt.Sprintf("/public/%s", filename),
+			File_name: filename,
+			Size:      strconv.FormatInt(file.Size, 10),
+			Format:    filepath.Ext(file.Filename),
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
-	}
-
-	// Buat entitas File untuk disimpan dalam database
-	fileModel := models.File{
-		Path:      fmt.Sprintf("/public/%s", filename),
-		File_name: filename,
-		Size:      strconv.FormatInt(file.Size, 10),
-		Format:    filepath.Ext(file.Filename),
-	}
-
-	// Simpan file ke dalam database
-	if err := initialize.DB.Create(&fileModel).Error; err != nil {
-		response := helpers.ResponseMassage{
-			Code:    fiber.StatusInternalServerError,
-			Status:  "Internal Server Error",
-			Message: "Failed to save file data",
+		// Simpan file ke dalam database
+		if err := initialize.DB.Create(&fileModel).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to save file data",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
 
 	// Hash password

@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"Matahariled/helpers"
+	"fmt"
 	"os"
 	"strings"
 
@@ -9,80 +10,77 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// JWTMiddleware adalah middleware untuk melakukan autentikasi JWT
-func JWTMiddleware(allowedRoles ...string) fiber.Handler {
+func MultiRoleMiddleware(allowedRoles ...string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Ambil token dari header Authorization
-		header := c.Get("Authorization")
-		if header == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
-				Code:    fiber.StatusUnauthorized,
-				Status:  "Unauthorized",
-				Message: "Missing Authorization header",
+		tokenString := c.Get("Authorization")
+
+		// Periksa apakah token kosong
+		if tokenString == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Access Token Diperlukan",
 			})
 		}
 
-		// Parse token
-		token := strings.Split(header, " ")
-		if len(token) != 2 || token[0] != "Bearer" {
+		// Pisahkan nilai token JWT dari string "Bearer <token>"
+		tokenParts := strings.Split(tokenString, " ")
+		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
 			return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
 				Code:    fiber.StatusUnauthorized,
 				Status:  "Unauthorized",
-				Message: "Invalid authorization token",
+				Message: "Invalid Token Bearrer",
 			})
 		}
+		jwtToken := tokenParts[1]
 
-		// Validasi token
-		claims := jwt.MapClaims{}
-		parsedToken, err := jwt.ParseWithClaims(token[1], &claims, func(token *jwt.Token) (interface{}, error) {
-			return []byte(os.Getenv("JWT_SECRET")), nil
+		var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+		// Parse token JWT
+		token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("metode signing tidak valid: %v", token.Header["alg"])
+			}
+			return jwtSecret, nil
 		})
+
+		// Periksa apakah terjadi kesalahan saat parsing token
 		if err != nil {
-			if err == jwt.ErrSignatureInvalid {
-				return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
-					Code:    fiber.StatusUnauthorized,
-					Status:  "Unauthorized",
-					Message: "Invalid token signature",
-				})
-			}
-			return c.Status(fiber.StatusBadRequest).JSON(helpers.ResponseMassage{
-				Code:    fiber.StatusBadRequest,
-				Status:  "Bad Request",
-				Message: "Failed to parse JWT token",
-			})
-		}
-		if !parsedToken.Valid {
 			return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
 				Code:    fiber.StatusUnauthorized,
 				Status:  "Unauthorized",
-				Message: "Invalid token",
+				Message: "Terjadi Kesalahan",
 			})
 		}
 
-		// Set data pengguna dari token ke konteks jika valid
-		c.Locals("user_id", claims["user_id"])
-		c.Locals("email", claims["email"])
-		c.Locals("role", claims["role"])
+		// Periksa apakah token valid
+		if !token.Valid {
+			return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+				Code:    fiber.StatusUnauthorized,
+				Status:  "Unauthorized",
+				Message: "Token Tidak Valid",
+			})
+		}
 
-		// Periksa peran pengguna jika peran yang diperlukan diberikan
-		if len(allowedRoles) > 0 {
-			role := claims["role"].(string)
-			roleAllowed := false
-			for _, allowedRole := range allowedRoles {
-				if role == allowedRole {
-					roleAllowed = true
-					break
-				}
-			}
-			if !roleAllowed {
-				return c.Status(fiber.StatusForbidden).JSON(helpers.ResponseMassage{
-					Code:    fiber.StatusForbidden,
-					Status:  "Forbidden",
-					Message: "User role is not allowed to access this resource",
-				})
+		// Ambil klaim dari token
+		claims := token.Claims.(jwt.MapClaims)
+
+		// Periksa apakah peran pengguna ada di dalam daftar peran yang diperbolehkan
+		userRole := claims["role"].(string)
+		roleAllowed := false
+		for _, allowedRole := range allowedRoles {
+			if userRole == allowedRole {
+				roleAllowed = true
+				break
 			}
 		}
 
+		// Jika peran pengguna tidak diizinkan, kembalikan status Unauthorized
+		if !roleAllowed {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "Anda Tidak Memiliki Akses",
+			})
+		}
+
+		// Jika peran pengguna diizinkan, lanjutkan ke handler berikutnya
 		return c.Next()
 	}
 }

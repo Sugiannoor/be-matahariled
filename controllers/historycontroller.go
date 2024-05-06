@@ -6,6 +6,7 @@ import (
 	"Matahariled/models"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -127,7 +128,7 @@ func GetCountHistory(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 
-func GetDatatableHistories(c *fiber.Ctx) error {
+func GetDatatableHistoriess(c *fiber.Ctx) error {
 	// Ambil nilai parameter limit, sort, sort_by, search, dan product_id dari query string
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	sort := c.Query("sort")
@@ -216,6 +217,116 @@ func GetDatatableHistories(c *fiber.Ctx) error {
 	// Kembalikan respons JSON dengan format DataTable
 	return c.JSON(helpers.GeneralResponse{
 		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   response,
+	})
+}
+func GetDatatableHistories(c *fiber.Ctx) error {
+	// Ambil nilai parameter limit, page, sort, sort_by, dan search dari query string
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	page, _ := strconv.Atoi(c.Query("page"))
+	sort := c.Query("sort")
+	sortBy := c.Query("sort_by")
+	search := c.Query("search")
+	productID := c.Query("product_id")
+	// Tentukan default nilai jika parameter tidak ada
+	if limit <= 0 {
+		limit = 10 // Nilai default untuk limit adalah 10
+	}
+	if page <= 0 {
+		page = 1 // Halaman default adalah 1
+	}
+
+	// Hitung offset berdasarkan halaman dan limit
+	offset := (page - 1) * limit
+
+	// Lakukan pengambilan data dari database dengan menggunakan parameter limit, offset, sort, dan sort_by
+	var histories []models.History
+	query := initialize.DB.Preload("Product").Preload("Product.Category").Preload("User").Preload("File").Preload("Video").Model(&models.History{})
+
+	// Jika parameter search tidak kosong, tambahkan filter pencarian
+	if search != "" {
+		query = query.Where("title LIKE ? OR description LIKE ?", "%"+search+"%", "%"+search+"%")
+	}
+
+	// Jika parameter sort dan sort_by disediakan, lakukan pengurutan berdasarkan kolom yang dimaksud
+	if sort != "" && sortBy != "" {
+		query = query.Order(fmt.Sprintf("%s %s", sortBy, sort))
+	}
+
+	if productID != "" {
+		query = query.Where("product_id = ?", productID)
+	}
+
+	// Limit jumlah data yang diambil sesuai dengan nilai parameter limit dan offset
+	query = query.Limit(limit).Offset(offset)
+
+	// Lakukan pengambilan data
+	if err := query.Find(&histories).Error; err != nil {
+		// Jika terjadi kesalahan saat mengambil produk, kirim respons kesalahan ke klien
+		response := helpers.GeneralResponse{
+			Code:   500,
+			Status: "Internal Server Error",
+			Data:   nil,
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Hitung total jumlah record tanpa paginasi
+	var totalRecords int64
+	if err := initialize.DB.Model(&models.Product{}).Count(&totalRecords).Error; err != nil {
+		response := helpers.GeneralResponse{
+			Code:   500,
+			Status: "Internal Server Error",
+			Data:   nil,
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Hitung total jumlah halaman berdasarkan total jumlah record dan limit
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(limit)))
+
+	response := helpers.DataTableResponse{
+		CurrentPage:  page,
+		FirstPageURL: "", // Anda bisa menentukan URL halaman pertama jika perlu
+		From:         offset + 1,
+		LastPage:     totalPages,
+		LastPageURL:  "", // Anda bisa menentukan URL halaman terakhir jika perlu
+		NextPageURL:  "", // Anda bisa menentukan URL halaman berikutnya jika perlu
+		PrevPageURL:  "", // Anda bisa menentukan URL halaman sebelumnya jika perlu
+		To:           offset + len(histories),
+		Total:        int(totalRecords),
+		Data:         make([]interface{}, len(histories)),
+	}
+
+	for i, history := range histories {
+		// Buat map untuk setiap produk
+		historyMap := map[string]interface{}{
+			"history_id":    history.HistoryId,
+			"title":         history.Title,
+			"description":   history.Description,
+			"product_id":    history.ProductId,
+			"product_name":  history.Product.Title,
+			"start_date":    history.StartDate,
+			"end_date":      history.EndDate,
+			"embed":         history.Video.Embed,
+			"video_title":   history.Video.Title,
+			"user_id":       history.UserId,
+			"user":          history.User.FullName,
+			"category_name": history.Product.Category.Category,
+			"file_id":       history.FileId,
+			"path_file":     history.File.Path,
+			"created_at":    history.CreatedAt,
+			"updated_at":    history.UpdatedAt,
+		}
+
+		// Tambahkan map produk ke dalam slice Data pada respons
+		response.Data[i] = historyMap
+	}
+
+	// Kembalikan respons JSON dengan format datatable
+	return c.JSON(helpers.GeneralResponse{
+		Code:   200,
 		Status: "OK",
 		Data:   response,
 	})
@@ -509,6 +620,8 @@ func UpdateHistory(c *fiber.Ctx) error {
 	history.ProductId = productId
 	history.UserId = userId
 
+	oldVideoId := history.VideoId
+
 	if history.VideoId != 0 {
 		history.Video.Title = video_title
 		history.Video.Embed = embed
@@ -517,6 +630,14 @@ func UpdateHistory(c *fiber.Ctx) error {
 				Code:    fiber.StatusInternalServerError,
 				Status:  "Internal Server Error",
 				Message: "Failed to update associated video",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+		if err := initialize.DB.Where("id = ?", oldVideoId).Delete(&models.Video{}).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete old video",
 			}
 			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
