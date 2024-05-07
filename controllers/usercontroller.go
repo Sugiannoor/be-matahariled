@@ -540,25 +540,14 @@ func CreateUserForm(c *fiber.Ctx) error {
 
 	var fileModel models.File
 
-	// Simpan file yang diunggah ke folder public
+	// Periksa apakah ada file yang diunggah
 	file, err := c.FormFile("file")
-	if err != nil {
-
-	} else {
-
+	if err == nil {
+		// Jika ada file yang diunggah
 		filename := uuid.New().String() + filepath.Ext(file.Filename)
 
-		// Simpan file ke direktori publik
-		if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
-			response := helpers.ResponseMassage{
-				Code:    fiber.StatusInternalServerError,
-				Status:  "Internal Server Error",
-				Message: "Failed to save file",
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(response)
-		}
 		// Buat entitas File untuk disimpan dalam database
-		fileModel := models.File{
+		fileModel = models.File{
 			Path:      fmt.Sprintf("/public/%s", filename),
 			File_name: filename,
 			Size:      strconv.FormatInt(file.Size, 10),
@@ -569,7 +558,15 @@ func CreateUserForm(c *fiber.Ctx) error {
 			response := helpers.ResponseMassage{
 				Code:    fiber.StatusInternalServerError,
 				Status:  "Internal Server Error",
-				Message: "Failed to save file data",
+				Message: "Failed to save file database",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+		if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to save file",
 			}
 			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
@@ -595,9 +592,12 @@ func CreateUserForm(c *fiber.Ctx) error {
 		Email:       email,
 		Address:     &address,
 		Role:        role,
-		FileId:      fileModel.FileId,
 	}
 
+	// Tambahkan ID file jika ada file yang diunggah
+	if fileModel.FileId != 0 {
+		user.FileId = fileModel.FileId
+	}
 	// Simpan pengguna ke dalam database
 	if err := initialize.DB.Create(&user).Error; err != nil {
 		response := helpers.ResponseMassage{
