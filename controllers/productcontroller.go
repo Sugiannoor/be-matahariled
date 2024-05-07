@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -765,3 +766,132 @@ func DeleteProductT(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }
+
+func GetProductsHero(c *fiber.Ctx) error {
+	// Hitung jumlah total produk
+	var totalProducts int64
+	if err := initialize.DB.Model(&models.Hero{}).Count(&totalProducts).Error; err != nil {
+		// Jika terjadi kesalahan saat menghitung jumlah produk, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat array indeks produk
+	indices := make([]int64, totalProducts)
+	for i := int64(0); i < totalProducts; i++ {
+		indices[i] = i + 1
+	}
+
+	// Acak urutan indeks
+	rand.Shuffle(len(indices), func(i, j int) {
+		indices[i], indices[j] = indices[j], indices[i]
+	})
+
+	// Ambil 5 indeks pertama setelah diacak
+	limit := 5
+	if len(indices) < limit {
+		limit = len(indices)
+	}
+	randomIndices := indices[:limit]
+
+	// Ambil 5 produk dengan indeks yang sudah diacak
+	var products []models.Hero
+	if err := initialize.DB.Preload("products").Where("product_id IN (?)", randomIndices).Find(&products).Error; err != nil {
+		// Jika terjadi kesalahan saat mengambil produk, kirim respons kesalahan ke klien
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Terjadi Kesalahan Server",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat respons dengan format yang diinginkan
+	var productOptions []map[string]interface{}
+	for _, product := range products {
+		option := map[string]interface{}{
+			"product_id": product.ProductId,
+			"path":     product.Path,
+		}
+		productOptions = append(productOptions, option)
+	}
+
+	// Kembalikan respons sukses dengan data produk ke klien
+	response := helpers.GeneralResponse{
+		Code:   fiber.StatusOK,
+		Status: "OK",
+		Data:   productOptions,
+	}
+	return c.JSON(response)
+}
+
+func CreateHero(c *fiber.Ctx) error {
+	// Parse inputan dari form
+	var requestBody struct {
+		ProductId int64 `form:"product_id"`
+	}
+	if err := c.BodyParser(&requestBody); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Failed to parse request body"})
+	}
+
+	// Validasi apakah ID produk valid
+	var product models.Product
+	if err := initialize.DB.First(&product, requestBody.ProductId).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Product not found"})
+	}
+
+	// Periksa apakah file diunggah
+	file, err := c.FormFile("file")
+	if err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "File is required",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
+
+	// Simpan file yang diunggah ke folder public
+	filename := uuid.New().String() + filepath.Ext(file.Filename)
+	filePath := fmt.Sprintf("/public/%s", filename)
+	if err := c.SaveFile(file, fmt.Sprintf("./public/%s", filename)); err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save file",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Buat entitas Hero untuk disimpan dalam database
+	hero := models.Hero{
+		Path:      filePath,
+		Hero_name: filename,
+		Size:      strconv.FormatInt(file.Size, 10),
+		Format:    filepath.Ext(file.Filename),
+		ProductId: requestBody.ProductId,
+	}
+
+	// Simpan data hero ke dalam database
+	if err := initialize.DB.Create(&hero).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to save hero data",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+
+	// Kirim respons sukses
+	response := helpers.GeneralResponse{
+		Code:    fiber.StatusOK,
+		Status:  "OK",
+		Data:    hero,
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
+}
+
