@@ -49,9 +49,9 @@ func main() {
 	product.Post("/", controllers.CreateProductT)
 	product.Put("/:id", controllers.UpdateProduct)
 	product.Delete("/", controllers.DeleteProductT)
-	product.Get("/:id", controllers.GetProductById)
-	product.Get("/hero", controllers.GetProductsHero)
 	product.Post("/hero", controllers.CreateHero)
+	product.Get("/hero", controllers.GetHero)
+	product.Get("/:id", controllers.GetProductById)
 	// Group Category
 	category := api.Group("/category")
 	category.Get("/label", controllers.GetCategoriesLabel)
