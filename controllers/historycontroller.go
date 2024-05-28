@@ -622,7 +622,7 @@ func UpdateHistory(c *fiber.Ctx) error {
 
 	oldVideoId := history.VideoId
 
-	if history.VideoId != 0  {
+	if history.VideoId != 0 {
 		newVideo := models.Video{
 			Title: video_title,
 			Embed: embed,
@@ -653,7 +653,6 @@ func UpdateHistory(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
 	} else {
-		// Jika belum ada video terkait, buat yang baru
 		newVideo := models.Video{
 			Title: video_title,
 			Embed: embed,
@@ -689,93 +688,92 @@ func UpdateHistory(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusOK).JSON(response)
 }
 func DeleteHistory(c *fiber.Ctx) error {
-    // Ambil history ID dari parameter URL
-    historyID, err := strconv.ParseInt(c.Params("id"), 10, 64)
-    if err != nil || historyID <= 0 {
-        response := helpers.ResponseMassage{
-            Code:    fiber.StatusBadRequest,
-            Status:  "Bad Request",
-            Message: "Invalid or missing History ID",
-        }
-        return c.Status(fiber.StatusBadRequest).JSON(response)
-    }
+	// Ambil history ID dari parameter URL
+	historyID, err := strconv.ParseInt(c.Params("id"), 10, 64)
+	if err != nil || historyID <= 0 {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "Invalid or missing History ID",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
 
-    // Periksa apakah riwayat dengan historyID tersebut ada di database
-    var history models.History
-    if err := initialize.DB.First(&history, historyID).Error; err != nil {
-        response := helpers.ResponseMassage{
-            Code:    fiber.StatusBadRequest,
-            Status:  "Bad Request",
-            Message: "History Not Found",
-        }
-        return c.Status(fiber.StatusBadRequest).JSON(response)
-    }
+	// Periksa apakah riwayat dengan historyID tersebut ada di database
+	var history models.History
+	if err := initialize.DB.First(&history, historyID).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusBadRequest,
+			Status:  "Bad Request",
+			Message: "History Not Found",
+		}
+		return c.Status(fiber.StatusBadRequest).JSON(response)
+	}
 
-    // Hapus riwayat dari basis data
-    if err := initialize.DB.Delete(&history).Error; err != nil {
-        response := helpers.ResponseMassage{
-            Code:    fiber.StatusInternalServerError,
-            Status:  "Internal Server Error",
-            Message: "Failed to delete history",
-        }
-        return c.Status(fiber.StatusInternalServerError).JSON(response)
-    }
+	// Hapus riwayat dari basis data
+	if err := initialize.DB.Delete(&history).Error; err != nil {
+		response := helpers.ResponseMassage{
+			Code:    fiber.StatusInternalServerError,
+			Status:  "Internal Server Error",
+			Message: "Failed to delete history",
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
 
-    // Hapus video terkait jika ada
-    if history.VideoId != 0 {
-        if err := initialize.DB.Delete(&models.Video{}, history.VideoId).Error; err != nil {
-            response := helpers.ResponseMassage{
-                Code:    fiber.StatusInternalServerError,
-                Status:  "Internal Server Error",
-                Message: "Failed to delete associated video",
-            }
-            return c.Status(fiber.StatusInternalServerError).JSON(response)
-        }
-    }
+	// Hapus video terkait jika ada
+	if history.VideoId != 0 {
+		if err := initialize.DB.Delete(&models.Video{}, history.VideoId).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete associated video",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+	}
 
-    // Hapus file terkait dari sistem file lokal jika ada
-    if history.FileId != 0 {
-        // Memuat data file terkait
-        if err := initialize.DB.Model(&history).Association("File").Find(&history.File); err != nil {
-            // Handle error jika gagal memuat data file
-            response := helpers.ResponseMassage{
-                Code:    fiber.StatusInternalServerError,
-                Status:  "Internal Server Error",
-                Message: "Failed to load file data",
-            }
-            return c.Status(fiber.StatusInternalServerError).JSON(response)
-        }
+	// Hapus file terkait dari sistem file lokal jika ada
+	if history.FileId != 0 {
+		// Memuat data file terkait
+		if err := initialize.DB.Model(&history).Association("File").Find(&history.File); err != nil {
+			// Handle error jika gagal memuat data file
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to load file data",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
 
-        // Hapus file dari sistem file lokal
-        if err := os.Remove("." + history.File.Path); err != nil {
-            response := helpers.ResponseMassage{
-                Code:    fiber.StatusInternalServerError,
-                Status:  "Internal Server Error",
-                Message: "Failed to delete local file",
-            }
-            return c.Status(fiber.StatusInternalServerError).JSON(response)
-        }
+		// Hapus file dari sistem file lokal
+		if err := os.Remove("." + history.File.Path); err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete local file",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
 
-        // Hapus entitas file dari basis data
-        if err := initialize.DB.Delete(&history.File).Error; err != nil {
-            response := helpers.ResponseMassage{
-                Code:    fiber.StatusInternalServerError,
-                Status:  "Internal Server Error",
-                Message: "Failed to delete file data",
-            }
-            return c.Status(fiber.StatusInternalServerError).JSON(response)
-        }
-    }
+		// Hapus entitas file dari basis data
+		if err := initialize.DB.Delete(&history.File).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete file data",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+	}
 
-    // Kirim respons sukses
-    response := helpers.ResponseMassage{
-        Code:    fiber.StatusOK,
-        Status:  "OK",
-        Message: "History deleted successfully",
-    }
-    return c.Status(fiber.StatusOK).JSON(response)
+	// Kirim respons sukses
+	response := helpers.ResponseMassage{
+		Code:    fiber.StatusOK,
+		Status:  "OK",
+		Message: "History deleted successfully",
+	}
+	return c.Status(fiber.StatusOK).JSON(response)
 }
-
 
 func GetAllUserPortfolios(c *fiber.Ctx) error {
 	// Ambil semua data history dari database
