@@ -690,7 +690,6 @@ func CreateProductT(c *fiber.Ctx) error {
 
 func DeleteProductT(c *fiber.Ctx) error {
 	// Ambil ID produk dari parameter URL
-	var hero models.Hero
 	productId, err := strconv.ParseInt(c.Query("id"), 10, 64)
 	if err != nil {
 		response := helpers.ResponseMassage{
@@ -712,6 +711,29 @@ func DeleteProductT(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(response)
 	}
 
+	// Ambil data hero yang terkait dengan produk
+	var hero models.Hero
+	if err := initialize.DB.Where("product_id = ?", productId).First(&hero).Error; err == nil {
+		// Jika hero ditemukan, hapus file hero dari disk
+		if err := os.Remove("." + hero.Path); err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete hero image",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+		// Hapus data hero dari database
+		if err := initialize.DB.Delete(&hero).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete hero data",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+	}
+
 	// Hapus galeri-galeri terkait dengan produk
 	for _, gallery := range product.Gallery {
 		if err := os.Remove("." + gallery.Path); err != nil {
@@ -731,6 +753,8 @@ func DeleteProductT(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(response)
 		}
 	}
+
+	// Hapus file produk dari disk
 	if err := os.Remove("." + product.File.Path); err != nil {
 		response := helpers.ResponseMassage{
 			Code:    fiber.StatusInternalServerError,
@@ -747,24 +771,6 @@ func DeleteProductT(c *fiber.Ctx) error {
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
-	if hero.ProductId != 0 {
-		if err := os.Remove("." + hero.Path); err != nil {
-			response := helpers.ResponseMassage{
-				Code:    fiber.StatusInternalServerError,
-				Status:  "Internal Server Error",
-				Message: "Failed to delete gallery",
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(response)
-		}
-		if err := initialize.DB.Delete(&hero).Error; err != nil {
-			response := helpers.ResponseMassage{
-				Code:    fiber.StatusInternalServerError,
-				Status:  "Internal Server Error",
-				Message: "Failed to delete product",
-			}
-			return c.Status(fiber.StatusInternalServerError).JSON(response)
-		}
-	}
 
 	// Hapus produk dari database
 	if err := initialize.DB.Delete(&product).Error; err != nil {
@@ -780,7 +786,7 @@ func DeleteProductT(c *fiber.Ctx) error {
 	response := helpers.ResponseMassage{
 		Code:    fiber.StatusOK,
 		Status:  "OK",
-		Message: "Product and its galleries deleted successfully",
+		Message: "Product, its galleries, and related hero deleted successfully",
 	}
 	return c.Status(fiber.StatusOK).JSON(response)
 }
