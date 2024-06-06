@@ -438,6 +438,7 @@ func EditUser(c *fiber.Ctx) error {
 	// Update data pengguna yang ada dengan data baru
 	existingUser.FullName = updatedUser.FullName
 	existingUser.UserName = updatedUser.UserName
+	existingUser.Role = updatedUser.Role
 	existingUser.Email = updatedUser.Email
 	existingUser.PhoneNumber = updatedUser.PhoneNumber
 	existingUser.Address = updatedUser.Address

@@ -690,6 +690,7 @@ func CreateProductT(c *fiber.Ctx) error {
 
 func DeleteProductT(c *fiber.Ctx) error {
 	// Ambil ID produk dari parameter URL
+	var hero models.Hero
 	productId, err := strconv.ParseInt(c.Query("id"), 10, 64)
 	if err != nil {
 		response := helpers.ResponseMassage{
@@ -745,6 +746,24 @@ func DeleteProductT(c *fiber.Ctx) error {
 			Message: "Failed to delete file",
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
+	if hero.ProductId != 0 {
+		if err := os.Remove("." + hero.Path); err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete gallery",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
+		if err := initialize.DB.Delete(&hero).Error; err != nil {
+			response := helpers.ResponseMassage{
+				Code:    fiber.StatusInternalServerError,
+				Status:  "Internal Server Error",
+				Message: "Failed to delete product",
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(response)
+		}
 	}
 
 	// Hapus produk dari database
