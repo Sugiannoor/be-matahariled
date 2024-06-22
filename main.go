@@ -8,11 +8,10 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 
+	"os"
+
 	"github.com/subosito/gotenv"
-
 )
-
-var DB *gorm.DB
 
 func main() {
 	gotenv.Load()
