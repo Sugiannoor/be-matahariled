@@ -98,6 +98,6 @@ func main() {
 	gallery := api.Group("/gallery")
 	gallery.Get("/:id", controllers.GetGalleryById)
 
-	app.Listen(port)
+	app.Listen(":" + port)
 
 }
