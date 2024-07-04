@@ -7,9 +7,15 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+
+	"os"
+
+	"github.com/subosito/gotenv"
 )
 
 func main() {
+	gotenv.Load()
+	port := os.Getenv("PORT")
 	initialize.ConnectDatabase()
 
 	app := fiber.New()
@@ -92,6 +98,6 @@ func main() {
 	gallery := api.Group("/gallery")
 	gallery.Get("/:id", controllers.GetGalleryById)
 
-	app.Listen(":8000")
+	app.Listen(":" + port)
 
 }
