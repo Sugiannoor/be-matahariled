@@ -5,6 +5,7 @@ import (
 	"Matahariled/initialize"
 	"Matahariled/models"
 	"fmt"
+	"math"
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
@@ -218,6 +219,7 @@ func GetContractByID(c *fiber.Ctx) error {
 func GetContractsDataTable(c *fiber.Ctx) error {
 	// Ambil nilai parameter limit, sort, sort_by, dan search dari query string
 	limit, _ := strconv.Atoi(c.Query("limit"))
+	page, _ := strconv.Atoi(c.Query("page"))
 	sort := c.Query("sort")
 	sortBy := c.Query("sort_by")
 	search := c.Query("search")
@@ -227,7 +229,7 @@ func GetContractsDataTable(c *fiber.Ctx) error {
 	if limit <= 0 {
 		limit = 10 // Nilai default untuk limit adalah 10
 	}
-
+	offset := (page - 1) * limit
 	// Lakukan pengambilan data dari database dengan menggunakan parameter limit, sort, dan sort_by
 	var contracts []models.Contract
 	query := initialize.DB.Preload("User").Preload("Products")
@@ -247,8 +249,17 @@ func GetContractsDataTable(c *fiber.Ctx) error {
 		query = query.Order(fmt.Sprintf("%s %s", sortBy, sort))
 	}
 
+	var totalRecords int64
+	if err := initialize.DB.Model(&models.Contract{}).Count(&totalRecords).Error; err != nil {
+		response := helpers.GeneralResponse{
+			Code:   500,
+			Status: "Internal Server Error",
+			Data:   nil,
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
 	// Limit jumlah data yang diambil sesuai dengan nilai parameter limit
-	query = query.Limit(limit)
+	query = query.Limit(limit).Offset(offset)
 
 	// Lakukan pengambilan data
 	if err := query.Find(&contracts).Error; err != nil {
@@ -260,6 +271,8 @@ func GetContractsDataTable(c *fiber.Ctx) error {
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
+
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(limit)))
 
 	// Membuat slice untuk menyimpan respons data kontrak
 	contractResponses := make([]models.ContractResponseDatatable, len(contracts))
@@ -299,7 +312,7 @@ func GetContractsDataTable(c *fiber.Ctx) error {
 		CurrentPage:  1,              // Nomor halaman saat ini (default 1)
 		FirstPageURL: "",             // URL halaman pertama
 		From:         1,              // Nomor record pertama pada halaman saat ini
-		LastPage:     1,              // Total jumlah halaman (default 1)
+		LastPage:     totalPages,     // Total jumlah halaman (default 1)
 		LastPageURL:  "",             // URL halaman terakhir
 		NextPageURL:  "",             // URL halaman berikutnya
 		PrevPageURL:  "",             // URL halaman sebelumnya

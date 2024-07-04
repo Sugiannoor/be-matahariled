@@ -1,7 +1,10 @@
 package initialize
 
 import (
+	"Matahariled/config"
 	"Matahariled/models"
+	"fmt"
+	"log"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -10,9 +13,16 @@ import (
 var DB *gorm.DB
 
 func ConnectDatabase() {
-	db, err := gorm.Open(mysql.Open("root:@tcp(localhost:3306)/matahariled?parseTime=true"))
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		panic(err)
+		log.Fatalf("Could not load config: %v", err)
+	}
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic("Failed to connect to database!")
 	}
 
 	db.AutoMigrate(&models.User{})

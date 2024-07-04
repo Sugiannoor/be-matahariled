@@ -258,7 +258,15 @@ func GetDatatableHistories(c *fiber.Ctx) error {
 		query = query.Where("product_id = ?", productID)
 	}
 
-	// Limit jumlah data yang diambil sesuai dengan nilai parameter limit dan offset
+	var totalRecords int64
+	if err := initialize.DB.Model(&models.Product{}).Count(&totalRecords).Error; err != nil {
+		response := helpers.GeneralResponse{
+			Code:   500,
+			Status: "Internal Server Error",
+			Data:   nil,
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(response)
+	}
 	query = query.Limit(limit).Offset(offset)
 
 	// Lakukan pengambilan data
@@ -273,15 +281,6 @@ func GetDatatableHistories(c *fiber.Ctx) error {
 	}
 
 	// Hitung total jumlah record tanpa paginasi
-	var totalRecords int64
-	if err := initialize.DB.Model(&models.Product{}).Count(&totalRecords).Error; err != nil {
-		response := helpers.GeneralResponse{
-			Code:   500,
-			Status: "Internal Server Error",
-			Data:   nil,
-		}
-		return c.Status(fiber.StatusInternalServerError).JSON(response)
-	}
 
 	// Hitung total jumlah halaman berdasarkan total jumlah record dan limit
 	totalPages := int(math.Ceil(float64(totalRecords) / float64(limit)))
