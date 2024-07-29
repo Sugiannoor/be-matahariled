@@ -325,7 +325,7 @@ func CreateUser(c *fiber.Ctx) error {
 		response := helpers.ResponseMassage{
 			Code:    500,
 			Status:  "Internal Server Error",
-			Message: "Terjadi Kesalahan Server",
+			Message: "Gagal Melakukan Hash pada Password",
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
@@ -346,7 +346,7 @@ func CreateUser(c *fiber.Ctx) error {
 		response := helpers.ResponseMassage{
 			Code:    500,
 			Status:  "Internal Server Error",
-			Message: "Terjadi Kesalahan Server",
+			Message: "Gagal Membuat User",
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(response)
 	}
