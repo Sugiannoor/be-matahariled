@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -201,64 +200,31 @@ func GetUserById(c *fiber.Ctx) error {
 	return c.JSON(response)
 }
 func GetProfile(c *fiber.Ctx) error {
-	tokenString := c.Get("Authorization")
-
-	// Periksa apakah token kosong
-	if tokenString == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Access Token Diperlukan",
+	// Ambil ID pengguna dari lokal konteks
+	userID, ok := c.Locals("userID").(float64)
+	if !ok {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"code":    fiber.StatusInternalServerError,
+			"status":  "Internal Server Error",
+			"message": "Gagal Mengambil Id Dari Token",
 		})
 	}
 
-	// Pisahkan nilai token JWT dari string "Bearer <token>"
-	tokenParts := strings.Split(tokenString, " ")
-	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Format Token Tidak Valid",
-		})
-	}
-	jwtToken := tokenParts[1]
-
-	var jwtSecret = []byte(os.Getenv("JWT_SECRET"))
-	// Parse token JWT
-	token, err := jwt.Parse(jwtToken, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("metode signing tidak valid: %v", token.Header["alg"])
-		}
-		return jwtSecret, nil
-	})
-
-	// Periksa apakah terjadi kesalahan saat parsing token
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Terjadi Kesalahan",
+	// Query database untuk mendapatkan profil pengguna berdasarkan ID
+	var user models.User
+	if err := initialize.DB.Where("user_id = ?", int64(userID)).First(&user).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"code":    fiber.StatusNotFound,
+			"status":  "Not Found",
+			"message": "Pengguna Tidak Tersedia",
 		})
 	}
 
-	// Periksa apakah token valid
-	if !token.Valid {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-			"message": "Token Tidak Valid",
-		})
-	}
-
-	// Ambil klaim dari token
-	claims := token.Claims.(jwt.MapClaims)
-	// Ambil informasi pengguna dari klaim token
-	user := models.User{
-		UserId:      int64(claims["user_id"].(float64)),
-		UserName:    claims["username"].(string),
-		FullName:    claims["fullname"].(string),
-		Email:       claims["email"].(string),
-		PhoneNumber: claims["phone_number"].(string),
-		Role:        claims["role"].(string),
-	}
-
-	// Kirim data pengguna dalam respons
-	return c.JSON(helpers.GeneralResponse{
-		Code:   fiber.StatusOK,
-		Status: "OK",
-		Data:   user,
+	// Kirim respons dengan profil pengguna
+	return c.JSON(fiber.Map{
+		"code":   fiber.StatusOK,
+		"status": "OK",
+		"data":   user,
 	})
 }
 
@@ -276,45 +242,34 @@ func CreateUser(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}
 
-	// Validasi data
-	if err := validate.Struct(newUser); err != nil {
-		// Jika terjadi kesalahan validasi, kirim respons kesalahan ke klien
-		// Format respons bad request dengan detail pesan kesalahan
-		errors := make(map[string][]string)
-		for _, err := range err.(validator.ValidationErrors) {
-			field := err.Field()
-			var tagName string
-			switch field {
-			case "FullName":
-				tagName = "full_name"
-			case "UserId":
-				tagName = "user_id"
-			case "UserName":
-				tagName = "username"
-			case "PhoneNumber":
-				tagName = "phone_number"
-			case "Password":
-				tagName = "password"
-			case "Email":
-				tagName = "email"
-			case "Address":
-				tagName = "address"
-			case "Role":
-				tagName = "role"
-			case "CreatedAt":
-				tagName = "created_at"
-			case "UpdatedAt":
-				tagName = "updated_at"
-			default:
-				tagName = field
-			} // Mendapatkan nama tag JSON yang sesuai
-			message := tagName + " Mohon diisi" // Pesan kesalahan yang disesuaikan
-			errors[tagName] = append(errors[field], message)
-		}
+	validationErrors := make(map[string][]string)
+
+	// Validasi manual untuk setiap field
+	if newUser.FullName == "" {
+		validationErrors["full_name"] = append(validationErrors["full_name"], "Full Name Wajib Diisi")
+	}
+	if newUser.UserName == "" {
+		validationErrors["username"] = append(validationErrors["username"], "Username Wajib Diisi")
+	}
+	if newUser.PhoneNumber == "" {
+		validationErrors["phone_number"] = append(validationErrors["phone_number"], "Phone Number Wajib Diisi")
+	}
+	if newUser.Password == "" {
+		validationErrors["password"] = append(validationErrors["password"], "Password Wajib Diisi")
+	}
+	if newUser.Email == "" {
+		validationErrors["email"] = append(validationErrors["email"], "Email Wajib Diisi")
+	}
+	if newUser.Role == "" {
+		validationErrors["role"] = append(validationErrors["role"], "Role Wajib Diisi")
+	}
+
+	// Jika ada error, kirim response
+	if len(validationErrors) > 0 {
 		response := helpers.ResponseError{
-			Code:   400,
+			Code:   fiber.StatusBadRequest,
 			Status: "Bad Request",
-			Error:  errors,
+			Error:  validationErrors,
 		}
 		return c.Status(fiber.StatusBadRequest).JSON(response)
 	}
@@ -340,6 +295,7 @@ func CreateUser(c *fiber.Ctx) error {
 		Password:    string(hashedPassword),
 		Email:       newUser.Email,
 		Role:        newUser.Role,
+		FileId:      1,
 	}
 	// Buat pengguna baru di database
 	if err := initialize.DB.Create(&user).Error; err != nil {
@@ -360,8 +316,6 @@ func CreateUser(c *fiber.Ctx) error {
 	}
 	return c.Status(fiber.StatusCreated).JSON(response)
 }
-
-// Delete
 
 func DeleteUser(c *fiber.Ctx) error {
 	// Ambil ID pengguna dari query string

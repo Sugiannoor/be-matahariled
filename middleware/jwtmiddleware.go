@@ -17,8 +17,10 @@ func MultiRoleMiddleware(allowedRoles ...string) fiber.Handler {
 
 		// Periksa apakah token kosong
 		if tokenString == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Access Token Diperlukan",
+			return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+				Code:    fiber.StatusBadRequest,
+				Status:  "Bad Request",
+				Message: "Token Diperlukan",
 			})
 		}
 
@@ -41,8 +43,6 @@ func MultiRoleMiddleware(allowedRoles ...string) fiber.Handler {
 			}
 			return jwtSecret, nil
 		})
-
-		// Periksa apakah terjadi kesalahan saat parsing token
 		if err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
 				Code:    fiber.StatusUnauthorized,
@@ -62,7 +62,7 @@ func MultiRoleMiddleware(allowedRoles ...string) fiber.Handler {
 
 		// Ambil klaim dari token
 		claims := token.Claims.(jwt.MapClaims)
-
+		c.Locals("userID", claims["user_id"])
 		// Periksa apakah peran pengguna ada di dalam daftar peran yang diperbolehkan
 		userRole := claims["role"].(string)
 		roleAllowed := false
@@ -75,8 +75,10 @@ func MultiRoleMiddleware(allowedRoles ...string) fiber.Handler {
 
 		// Jika peran pengguna tidak diizinkan, kembalikan status Unauthorized
 		if !roleAllowed {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "Anda Tidak Memiliki Akses",
+			return c.Status(fiber.StatusUnauthorized).JSON(helpers.ResponseMassage{
+				Code:    fiber.StatusUnauthorized,
+				Status:  "Unauthorized",
+				Message: "Anda Tidak Ada Akses",
 			})
 		}
 

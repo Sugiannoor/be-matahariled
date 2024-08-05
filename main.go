@@ -4,11 +4,10 @@ import (
 	"Matahariled/controllers"
 	"Matahariled/initialize"
 	"Matahariled/middleware"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-
-	"os"
 
 	"github.com/subosito/gotenv"
 )
@@ -32,7 +31,7 @@ func main() {
 
 	// Group Auth
 	auth := api.Group("/auth")
-	auth.Get("/profile", controllers.GetProfile)
+	auth.Get("/profile", middleware.MultiRoleMiddleware("Customer", "Admin", "SuperAdmin"), controllers.GetProfile)
 	auth.Post("/login", controllers.LoginUser)
 	auth.Post("/register", controllers.CreateUser)
 
